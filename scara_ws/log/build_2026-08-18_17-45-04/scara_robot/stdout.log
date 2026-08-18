@@ -1,0 +1,125 @@
+-- The C compiler identification is GNU 11.4.0
+-- The CXX compiler identification is GNU 11.4.0
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /usr/bin/cc - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/c++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Found ament_cmake: 1.3.14 (/opt/ros/humble/share/ament_cmake/cmake)
+-- Found Python3: /usr/bin/python3 (found version "3.10.12") found components: Interpreter 
+-- Override CMake install command with custom implementation using symlinks instead of copying resources
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /home/hemanthros/scara_robot_ws/scara_ws/build/scara_robot
+-- Install configuration: ""
+-- Execute custom install script
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/urdf/SCARA URDF.csv
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/urdf/SCARA URDF.urdf
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/urdf/SCARA URDF_backup.urdf
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/urdf/SCARA URDF_original.urdf
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/urdf/scara.urdf.xacro
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/urdf/scara_gazebo.xacro
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/urdf/scara_ros2_control.xacro
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/1st_Link.STL
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/2nd_Link.STL
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/3rd_Link.STL
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/4th_Link.STL
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Arduino UNO case p1.SLDPRT
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Arduino UNO case p2.SLDPRT
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Arm 1 Cover.SLDPRT
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Arm 1.SLDPRT
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Arm 2 Cover.SLDPRT
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Arm 2.SLDPRT
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Ball Bearing 30x42x7mm.SLDPRT
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Ball Bearing 35x47x7mm.SLDPRT
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Ball Bearing 608 - 8x22x7mm.SLDPRT
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Base cover.SLDPRT
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Base.SLDPRT
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/GT2 Belt 200mm.SLDPRT
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/GT2 Belt 300mm 2.SLDPRT
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/GT2 Belt 300mm.SLDPRT
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/GT2 Belt 400mm 2.SLDPRT
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/GT2 Belt 400mm.SLDPRT
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/GT2 Pulley - 110 teeth - J1.SLDPRT
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/GT2 Pulley - 22 - 80 teeth.SLDPRT
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/GT2 Pulley - 23 - 80 teeth.SLDPRT
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/GT2 Pulley - 90 teeth - J3.SLDPRT
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/GT2 Pulley - 92 teeth - J2.SLDPRT
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/GT2 Pulley - Parametric.SLDPRT
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Gripper Cover.SLDPRT
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Gripper End.SLDPRT
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Gripper Hand Left.SLDPRT
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Gripper Hand Right.SLDPRT
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Gripper Mechanism Slider.SLDPRT
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Gripper Mechanism.SLDASM
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Gripper link 1.SLDPRT
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Gripper link 2.SLDPRT
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Gripper rail 6mm.SLDPRT
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Gripper to J3 connector.SLDPRT
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/J1 coupler.SLDPRT
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/J2 Coupler.SLDPRT
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/J3 Coupler.SLDPRT
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Lead Screw D8mm L380mm.SLDPRT
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Lead Screw Nut 8mm.SLDPRT
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Linear Bearing 10x19x29mm.SLDPRT
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/M4 50mm - Bolts.SLDPRT
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/M4 50mm - Bolts.step
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/M4 60mm - Bolts.SLDPRT
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/M4 60mm - Bolts.step
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/M4 Lock nut.SLDPRT
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/M4 Lock nut.step
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/M8 45mm - Bolts.SLDPRT
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/M8 45mm - Bolts.step
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/M8 Lock nut.SLDPRT
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/M8 Lock nut.step
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/M8 Washer.SLDPRT
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Micro switch.SLDPRT
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Micro switch.step
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/NEMA 17 Stepper L24mm - 20mm shaft.SLDPRT
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/NEMA 17 Stepper L24mm - 20mm shaft.step
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/SCARA Robot With Controlled Motion URDF.SLDASM
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/SCARA Robot With Controlled Motion.SLDASM
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/SCARA Robot.SLDASM
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Servo Holder.SLDPRT
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Servo MG996R Horn.SLDPRT
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Servo MG996R Horn.step
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Servo Motor MG996R 3D Model.SLDPRT
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Servo Motor MG996R 3D Model.step
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Smooth Rod Clamp.SLDPRT
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Smooth Rod D10mm L400mm.SLDPRT
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Stepper NEMA 17 -  20mm shaft.SLDPRT
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Stepper NEMA 17 -  20mm shaft.step
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Thrust Bearing - 40x60x13.SLDPRT
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Thrust Bearing 35x52x12mm.SLDPRT
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Top cover.SLDPRT
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Wide gripper end - Left side.SLDPRT
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Wide gripper end.SLDPRT
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Z-axis Bottom Plate.SLDPRT
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Z-axis Mount Platform.SLDPRT
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Z-axis Top Plate.SLDPRT
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/base_link.STL
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/left_finger_Link.STL
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/right_finger_Link.STL
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/config/joint_names_SCARA URDF.yaml
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/launch/gazebo.launch.py
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/worlds/scara.world.sdf
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/ament_index/resource_index/package_run_dependencies/scara_robot
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/ament_index/resource_index/parent_prefix_path/scara_robot
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/environment/ament_prefix_path.sh
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/environment/ament_prefix_path.dsv
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/environment/path.sh
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/environment/path.dsv
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/local_setup.bash
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/local_setup.sh
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/local_setup.zsh
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/local_setup.dsv
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/package.dsv
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/ament_index/resource_index/packages/scara_robot
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/cmake/scara_robotConfig.cmake
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/cmake/scara_robotConfig-version.cmake
+-- Symlinking: /home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/package.xml

@@ -1,0 +1,537 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<robot name="scara_robot">
+
+  <!-- ====================================================== -->
+  <!-- BASE LINK -->
+  <!-- ====================================================== -->
+
+  <link name="base_link">
+
+    <inertial>
+      <origin
+        xyz="-0.0242157141119104 0.0226937804541309 -0.0059842229345738"
+        rpy="0 0 0" />
+
+      <mass
+        value="0.783325276547075" />
+
+      <inertia
+        ixx="0.00139733008937135"
+        ixy="-1.49687160624348E-05"
+        ixz="-5.62813088262941E-06"
+        iyy="0.00370360407543659"
+        iyz="-4.76952235839991E-06"
+        izz="0.00252453864922092" />
+    </inertial>
+
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+
+      <geometry>
+        <mesh
+          filename="package://scara_robot/meshes/base_link.STL" />
+      </geometry>
+
+      <material name="">
+        <color
+          rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
+      </material>
+    </visual>
+
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+
+      <geometry>
+        <mesh
+          filename="package://scara_robot/meshes/base_link.STL" />
+      </geometry>
+    </collision>
+
+  </link>
+
+
+  <!-- ====================================================== -->
+  <!-- FIRST ARM -->
+  <!-- ====================================================== -->
+
+  <link name="1st_Link">
+
+    <inertial>
+      <origin
+        xyz="-2.25306501354933E-05 -0.204863296608431 0.0041018398279016"
+        rpy="0 0 0" />
+
+      <mass
+        value="0.786046307885705" />
+
+      <inertia
+        ixx="0.00246359493168174"
+        ixy="1.81389818670239E-07"
+        ixz="-1.87391552148776E-07"
+        iyy="0.000998648093431637"
+        iyz="-5.71083332134967E-06"
+        izz="0.00244838553855426" />
+    </inertial>
+
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+
+      <geometry>
+        <mesh
+          filename="package://scara_robot/meshes/1st_Link.STL" />
+      </geometry>
+
+      <material name="">
+        <color
+          rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
+      </material>
+    </visual>
+
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+
+      <geometry>
+        <mesh
+          filename="package://scara_robot/meshes/1st_Link.STL" />
+      </geometry>
+    </collision>
+
+  </link>
+
+
+  <!-- ====================================================== -->
+  <!-- JOINT 1 - BASE ROTATION -->
+  <!-- ====================================================== -->
+
+  <joint
+    name="joint_1"
+    type="revolute">
+
+    <origin
+      xyz="0.0425 0 0.023"
+      rpy="-1.5708 0 -1.5708" />
+
+    <parent
+      link="base_link" />
+
+    <child
+      link="1st_Link" />
+
+    <axis
+      xyz="0 0 1" />
+
+    <limit
+      lower="-3.14159"
+      upper="3.14159"
+      effort="10"
+      velocity="2" />
+
+  </joint>
+
+
+  <!-- ====================================================== -->
+  <!-- SECOND ARM -->
+  <!-- ====================================================== -->
+
+  <link name="2nd_Link">
+
+    <inertial>
+      <origin
+        xyz="-0.109089725794496 0.0269655238678843 -5.56439135811679E-05"
+        rpy="0 0 0" />
+
+      <mass
+        value="0.376369423873477" />
+
+      <inertia
+        ixx="0.00022515613899757"
+        ixy="-6.31415640474812E-07"
+        ixz="-1.18800438483678E-06"
+        iyy="0.00110719188187776"
+        iyz="2.01095589435235E-07"
+        izz="0.000958577635527993" />
+    </inertial>
+
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+
+      <geometry>
+        <mesh
+          filename="package://scara_robot/meshes/2nd_Link.STL" />
+      </geometry>
+
+      <material name="">
+        <color
+          rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
+      </material>
+    </visual>
+
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+
+      <geometry>
+        <mesh
+          filename="package://scara_robot/meshes/2nd_Link.STL" />
+      </geometry>
+    </collision>
+
+  </link>
+
+
+  <!-- ====================================================== -->
+  <!-- JOINT 2 - SECOND ARM ROTATION -->
+  <!-- ====================================================== -->
+
+  <joint
+    name="joint_2"
+    type="revolute">
+
+    <origin
+      xyz="0 -0.2895 0.228"
+      rpy="0 -1.5708 0" />
+
+    <parent
+      link="1st_Link" />
+
+    <child
+      link="2nd_Link" />
+
+    <axis
+      xyz="0 0 1" />
+
+    <limit
+      lower="-3.14159"
+      upper="3.14159"
+      effort="10"
+      velocity="2" />
+
+  </joint>
+
+
+  <!-- ====================================================== -->
+  <!-- Z AXIS / THIRD LINK -->
+  <!-- ====================================================== -->
+
+  <link name="3rd_Link">
+
+    <inertial>
+      <origin
+        xyz="0.0536341993935111 0.0347869069494742 1.2340445546728E-06"
+        rpy="0 0 0" />
+
+      <mass
+        value="0.422583832462174" />
+
+      <inertia
+        ixx="0.000218821082092349"
+        ixy="2.439215533224E-06"
+        ixz="-1.28251024371545E-08"
+        iyy="0.00126595084486977"
+        iyz="2.46636946090932E-09"
+        izz="0.00107879968160358" />
+    </inertial>
+
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+
+      <geometry>
+        <mesh
+          filename="package://scara_robot/meshes/3rd_Link.STL" />
+      </geometry>
+
+      <material name="">
+        <color
+          rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
+      </material>
+    </visual>
+
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+
+      <geometry>
+        <mesh
+          filename="package://scara_robot/meshes/3rd_Link.STL" />
+      </geometry>
+    </collision>
+
+  </link>
+
+
+  <!-- ====================================================== -->
+  <!-- JOINT 3 - VERTICAL PRISMATIC Z AXIS -->
+  <!-- ====================================================== -->
+
+  <joint
+    name="joint_3"
+    type="prismatic">
+
+    <origin
+      xyz="0 0 0"
+      rpy="-3.1416 0.0045344 0" />
+
+    <parent
+      link="2nd_Link" />
+
+    <child
+      link="3rd_Link" />
+
+    <axis
+      xyz="0 0 1" />
+
+    <limit
+      lower="-0.15"
+      upper="0.15"
+      effort="10"
+      velocity="0.2" />
+
+  </joint>
+
+
+  <!-- ====================================================== -->
+  <!-- FOURTH LINK / END EFFECTOR -->
+  <!-- ====================================================== -->
+
+  <link name="4th_Link">
+
+    <inertial>
+      <origin
+        xyz="0.00367671839030661 -0.0710426783064385 0.00125081848564196"
+        rpy="0 0 0" />
+
+      <mass
+        value="0.184579221367369" />
+
+      <inertia
+        ixx="6.07620109381922E-05"
+        ixy="9.24489519553463E-08"
+        ixz="3.6376821007342E-06"
+        iyy="6.1349157566073E-05"
+        iyz="2.9157700263311E-08"
+        izz="5.06154000834046E-05" />
+    </inertial>
+
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+
+      <geometry>
+        <mesh
+          filename="package://scara_robot/meshes/4th_Link.STL" />
+      </geometry>
+
+      <material name="">
+        <color
+          rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
+      </material>
+    </visual>
+
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+
+      <geometry>
+        <mesh
+          filename="package://scara_robot/meshes/4th_Link.STL" />
+      </geometry>
+    </collision>
+
+  </link>
+
+
+  <!-- ====================================================== -->
+  <!-- JOINT 4 - END EFFECTOR ROTATION -->
+  <!-- ====================================================== -->
+
+  <joint
+    name="joint_4"
+    type="continuous">
+
+    <origin
+      xyz="0.1365 0.0316 0"
+      rpy="3.1416 1.473 0" />
+
+    <parent
+      link="3rd_Link" />
+
+    <child
+      link="4th_Link" />
+
+    <axis
+      xyz="0 1 0" />
+
+  </joint>
+
+
+  <!-- ====================================================== -->
+  <!-- LEFT GRIPPER FINGER -->
+  <!-- ====================================================== -->
+
+  <link name="left_finger_Link">
+
+    <inertial>
+      <origin
+        xyz="0.0284208787735719 0.0204324393635668 0.0599892872296978"
+        rpy="0 0 0" />
+
+      <mass
+        value="0.0338623820621934" />
+
+      <inertia
+        ixx="2.39180297182644E-05"
+        ixy="-1.23570105680061E-06"
+        ixz="-1.97192332627963E-07"
+        iyy="1.66282313269493E-05"
+        iyz="-5.80106294122859E-07"
+        izz="1.04981654471848E-05" />
+    </inertial>
+
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+
+      <geometry>
+        <mesh
+          filename="package://scara_robot/meshes/left_finger_Link.STL" />
+      </geometry>
+
+      <material name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+
+      <geometry>
+        <mesh
+          filename="package://scara_robot/meshes/left_finger_Link.STL" />
+      </geometry>
+    </collision>
+
+  </link>
+
+
+  <!-- ====================================================== -->
+  <!-- LEFT FINGER FIXED JOINT -->
+  <!-- ====================================================== -->
+
+  <joint
+    name="joint_left"
+    type="fixed">
+
+    <origin
+      xyz="0.021804 -0.0589 -0.025035"
+      rpy="-1.5708 -1.2566 -3.1416" />
+
+    <parent
+      link="4th_Link" />
+
+    <child
+      link="left_finger_Link" />
+
+    <axis
+      xyz="0 0 0" />
+
+  </joint>
+
+
+  <!-- ====================================================== -->
+  <!-- RIGHT GRIPPER FINGER -->
+  <!-- ====================================================== -->
+
+  <link name="right_finger_Link">
+
+    <inertial>
+      <origin
+        xyz="-0.0284220102838154 0.020117967363907 0.0599565537639211"
+        rpy="0 0 0" />
+
+      <mass
+        value="0.0338937268163239" />
+
+      <inertia
+        ixx="2.39191375544596E-05"
+        ixy="1.23571754147123E-06"
+        ixz="2.92245162159484E-07"
+        iyy="1.66284158004962E-05"
+        iyz="-5.80116350668694E-07"
+        izz="1.04992189443486E-05" />
+    </inertial>
+
+    <visual>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+
+      <geometry>
+        <mesh
+          filename="package://scara_robot/meshes/right_finger_Link.STL" />
+      </geometry>
+
+      <material name="">
+        <color
+          rgba="1 1 1 1" />
+      </material>
+    </visual>
+
+    <collision>
+      <origin
+        xyz="0 0 0"
+        rpy="0 0 0" />
+
+      <geometry>
+        <mesh
+          filename="package://scara_robot/meshes/right_finger_Link.STL" />
+      </geometry>
+    </collision>
+
+  </link>
+
+
+  <!-- ====================================================== -->
+  <!-- RIGHT FINGER FIXED JOINT -->
+  <!-- ====================================================== -->
+
+  <joint
+    name="joint_right"
+    type="fixed">
+
+    <origin
+      xyz="0.061096 0 0"
+      rpy="0 0 0" />
+
+    <parent
+      link="left_finger_Link" />
+
+    <child
+      link="right_finger_Link" />
+
+    <axis
+      xyz="0 0 0" />
+
+  </joint>
+
+</robot>

@@ -1,0 +1,107 @@
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/urdf/SCARA URDF.csv
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/urdf/SCARA URDF.urdf
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/urdf/SCARA URDF_backup.urdf
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/urdf/SCARA URDF_original.urdf
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/urdf/scara.urdf.xacro
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/urdf/scara_gazebo.xacro
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/urdf/scara_ros2_control.xacro
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/1st_Link.STL
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/2nd_Link.STL
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/3rd_Link.STL
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/4th_Link.STL
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Arduino UNO case p1.SLDPRT
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Arduino UNO case p2.SLDPRT
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Arm 1 Cover.SLDPRT
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Arm 1.SLDPRT
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Arm 2 Cover.SLDPRT
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Arm 2.SLDPRT
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Ball Bearing 30x42x7mm.SLDPRT
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Ball Bearing 35x47x7mm.SLDPRT
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Ball Bearing 608 - 8x22x7mm.SLDPRT
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Base cover.SLDPRT
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Base.SLDPRT
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/GT2 Belt 200mm.SLDPRT
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/GT2 Belt 300mm 2.SLDPRT
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/GT2 Belt 300mm.SLDPRT
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/GT2 Belt 400mm 2.SLDPRT
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/GT2 Belt 400mm.SLDPRT
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/GT2 Pulley - 110 teeth - J1.SLDPRT
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/GT2 Pulley - 22 - 80 teeth.SLDPRT
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/GT2 Pulley - 23 - 80 teeth.SLDPRT
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/GT2 Pulley - 90 teeth - J3.SLDPRT
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/GT2 Pulley - 92 teeth - J2.SLDPRT
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/GT2 Pulley - Parametric.SLDPRT
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Gripper Cover.SLDPRT
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Gripper End.SLDPRT
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Gripper Hand Left.SLDPRT
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Gripper Hand Right.SLDPRT
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Gripper Mechanism Slider.SLDPRT
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Gripper Mechanism.SLDASM
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Gripper link 1.SLDPRT
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Gripper link 2.SLDPRT
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Gripper rail 6mm.SLDPRT
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Gripper to J3 connector.SLDPRT
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/J1 coupler.SLDPRT
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/J2 Coupler.SLDPRT
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/J3 Coupler.SLDPRT
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Lead Screw D8mm L380mm.SLDPRT
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Lead Screw Nut 8mm.SLDPRT
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Linear Bearing 10x19x29mm.SLDPRT
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/M4 50mm - Bolts.SLDPRT
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/M4 50mm - Bolts.step
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/M4 60mm - Bolts.SLDPRT
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/M4 60mm - Bolts.step
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/M4 Lock nut.SLDPRT
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/M4 Lock nut.step
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/M8 45mm - Bolts.SLDPRT
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/M8 45mm - Bolts.step
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/M8 Lock nut.SLDPRT
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/M8 Lock nut.step
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/M8 Washer.SLDPRT
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Micro switch.SLDPRT
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Micro switch.step
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/NEMA 17 Stepper L24mm - 20mm shaft.SLDPRT
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/NEMA 17 Stepper L24mm - 20mm shaft.step
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/SCARA Robot With Controlled Motion URDF.SLDASM
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/SCARA Robot With Controlled Motion.SLDASM
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/SCARA Robot.SLDASM
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Servo Holder.SLDPRT
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Servo MG996R Horn.SLDPRT
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Servo MG996R Horn.step
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Servo Motor MG996R 3D Model.SLDPRT
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Servo Motor MG996R 3D Model.step
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Smooth Rod Clamp.SLDPRT
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Smooth Rod D10mm L400mm.SLDPRT
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Stepper NEMA 17 -  20mm shaft.SLDPRT
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Stepper NEMA 17 -  20mm shaft.step
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Thrust Bearing - 40x60x13.SLDPRT
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Thrust Bearing 35x52x12mm.SLDPRT
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Top cover.SLDPRT
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Wide gripper end - Left side.SLDPRT
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Wide gripper end.SLDPRT
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Z-axis Bottom Plate.SLDPRT
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Z-axis Mount Platform.SLDPRT
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/Z-axis Top Plate.SLDPRT
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/base_link.STL
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/left_finger_Link.STL
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/meshes/right_finger_Link.STL
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/config/joint_names_SCARA URDF.yaml
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/config/scara_controllers.yaml
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/launch/gazebo.launch.py
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/launch/scara_gazebo.launch.py
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/worlds/scara.world.sdf
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/ament_index/resource_index/package_run_dependencies/scara_robot
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/ament_index/resource_index/parent_prefix_path/scara_robot
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/environment/ament_prefix_path.sh
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/environment/ament_prefix_path.dsv
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/environment/path.sh
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/environment/path.dsv
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/local_setup.bash
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/local_setup.sh
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/local_setup.zsh
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/local_setup.dsv
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/package.dsv
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/ament_index/resource_index/packages/scara_robot
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/cmake/scara_robotConfig.cmake
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/cmake/scara_robotConfig-version.cmake
+/home/hemanthros/scara_robot_ws/scara_ws/install/scara_robot/share/scara_robot/package.xml

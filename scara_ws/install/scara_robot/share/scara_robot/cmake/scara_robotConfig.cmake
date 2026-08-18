@@ -1,0 +1,1 @@
+/home/hemanthros/scara_robot_ws/scara_ws/build/scara_robot/ament_cmake_core/scara_robotConfig.cmake

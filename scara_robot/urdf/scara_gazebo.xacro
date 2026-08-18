@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <gazebo>
+    <plugin filename="gz_ros2_control-system" name="gz_ros2_control::GazeboSimROS2ControlPlugin">
+      <parameters>$(find scara_robot)/config/scara_controllers.yaml</parameters>
+    </plugin>
+  </gazebo>
+
+  <gazebo reference="base_link">
+    <material>Gazebo/Grey</material>
+    <self_collide>false</self_collide>
+  </gazebo>
+  <gazebo reference="j1_link">
+    <material>Gazebo/Blue</material>
+    <self_collide>false</self_collide>
+  </gazebo>
+  <gazebo reference="arm1_link">
+    <material>Gazebo/Red</material>
+    <self_collide>false</self_collide>
+  </gazebo>
+  <gazebo reference="arm2_link">
+    <material>Gazebo/Green</material>
+    <self_collide>false</self_collide>
+  </gazebo>
+  <gazebo reference="4th_Link">
+    <material>Gazebo/Cyan</material>
+    <self_collide>false</self_collide>
+  </gazebo>
+
+</robot>
