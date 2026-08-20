@@ -1,1 +1,0 @@
-controller_manager:gz_ros2_control:joint_state_broadcaster:joint_state_publisher:joint_state_publisher_gui:joint_trajectory_controller:robot_state_publisher:ros2_control:ros2_controllers:ros_gz_bridge:ros_gz_sim:xacro

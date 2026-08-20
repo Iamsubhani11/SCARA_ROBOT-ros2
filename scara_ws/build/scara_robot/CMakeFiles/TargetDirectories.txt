@@ -1,9 +1,0 @@
-/home/hemanthros/scara_robot_ws/scara_ws/build/scara_robot/CMakeFiles/uninstall.dir
-/home/hemanthros/scara_robot_ws/scara_ws/build/scara_robot/CMakeFiles/scara_robot_uninstall.dir
-/home/hemanthros/scara_robot_ws/scara_ws/build/scara_robot/CMakeFiles/test.dir
-/home/hemanthros/scara_robot_ws/scara_ws/build/scara_robot/CMakeFiles/edit_cache.dir
-/home/hemanthros/scara_robot_ws/scara_ws/build/scara_robot/CMakeFiles/rebuild_cache.dir
-/home/hemanthros/scara_robot_ws/scara_ws/build/scara_robot/CMakeFiles/list_install_components.dir
-/home/hemanthros/scara_robot_ws/scara_ws/build/scara_robot/CMakeFiles/install.dir
-/home/hemanthros/scara_robot_ws/scara_ws/build/scara_robot/CMakeFiles/install/local.dir
-/home/hemanthros/scara_robot_ws/scara_ws/build/scara_robot/CMakeFiles/install/strip.dir

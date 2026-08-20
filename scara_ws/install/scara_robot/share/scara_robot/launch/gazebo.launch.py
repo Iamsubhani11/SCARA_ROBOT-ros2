@@ -1,1 +1,0 @@
-/home/hemanthros/scara_robot_ws/scara_ws/src/scara_robot/launch/gazebo.launch.py

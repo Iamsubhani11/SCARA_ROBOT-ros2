@@ -1,4 +1,0 @@
-Invoking command in '/home/hemanthros/scara_robot_ws/scara_ws/build/scara_robot': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --build /home/hemanthros/scara_robot_ws/scara_ws/build/scara_robot -- -j16 -l16
-Invoked command in '/home/hemanthros/scara_robot_ws/scara_ws/build/scara_robot' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --build /home/hemanthros/scara_robot_ws/scara_ws/build/scara_robot -- -j16 -l16
-Invoking command in '/home/hemanthros/scara_robot_ws/scara_ws/build/scara_robot': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --install /home/hemanthros/scara_robot_ws/scara_ws/build/scara_robot
-Invoked command in '/home/hemanthros/scara_robot_ws/scara_ws/build/scara_robot' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/humble /usr/bin/cmake --install /home/hemanthros/scara_robot_ws/scara_ws/build/scara_robot
