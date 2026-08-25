@@ -4,27 +4,6 @@ A comprehensive ROS 2 Humble workspace featuring a **4-DOF SCARA Robot** mounted
 
 ---
 
-## 📸 Simulation Screenshots & Demo Video
-
-### 📹 Demonstration Video
-https://github.com/user-attachments/assets/scara_demo.webm
-
-*(Demo video file stored at [`docs/media/scara_demo.webm`](docs/media/scara_demo.webm))*
-
-<video src="docs/media/scara_demo.webm" controls="controls" width="100%" style="max-width:800px;"></video>
-
----
-
-### 🖼️ Gazebo Ignition Fortress Simulation
-![Gazebo Ignition Simulation](docs/media/gazebo_simulation.png)
-
----
-
-### 🖼️ MuJoCo 3.12 Simulation
-![MuJoCo Simulation](docs/media/mujoco_simulation.png)
-
----
-
 ## 🌟 Key Features
 
 - 🦾 **4-DOF SCARA Robot Model**: Full kinematic chain including `column_joint`, `shoulder_joint` (prismatic Z-axis), `forearm_joint`, `wrist_joint`, and dual-finger parallel gripper.
@@ -45,11 +24,6 @@ https://github.com/user-attachments/assets/scara_demo.webm
 scara_description_ws/
 ├── config/
 │   └── scara_controllers.yaml    # ros2_control JointTrajectoryController configuration
-├── docs/
-│   └── media/                    # Screenshots & demo video
-│       ├── gazebo_simulation.png
-│       ├── mujoco_simulation.png
-│       └── scara_demo.webm
 ├── launch/
 │   └── gazebo.launch.py          # Gazebo Ignition simulation launch file
 ├── meshes/
