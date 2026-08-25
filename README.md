@@ -1,4 +1,4 @@
-# SCARA Robot Simulation Workspace (ROS 2 Humble & MuJoCo)
+# SCARA Robot Simulation Workspace (ROS 2 Humble & MuJoCo,Gazebo)
 
 A comprehensive ROS 2 Humble workspace featuring a **4-DOF SCARA Robot** mounted on a wooden workspace table platform, complete with a **conveyor belt system**, **yellow puck payload object**, **automated pick-and-place state machine**, and dual simulation engine support (**Gazebo Ignition Fortress** and **MuJoCo 3.12**).
 
