@@ -13,7 +13,11 @@ install(
 )
 
 install(
-  PROGRAMS scripts/scara_teleop.py
+  PROGRAMS
+    scripts/scara_teleop.py
+    scripts/pick_and_place.py
+    scripts/launch_mujoco.py
+    scripts/scara_mujoco_teleop.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

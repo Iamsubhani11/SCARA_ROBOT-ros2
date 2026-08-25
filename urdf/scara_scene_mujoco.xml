@@ -1,0 +1,99 @@
+<mujoco model="scara_pick_and_place">
+  <compiler angle="radian" meshdir="../meshes" assetdir="../meshes"/>
+  <option timestep="0.002" gravity="0 0 -9.81"/>
+
+  <visual>
+    <headlight ambient="0.4 0.4 0.4" diffuse="0.8 0.8 0.8"/>
+  </visual>
+
+  <asset>
+    <!-- Textures & Materials -->
+    <texture type="2d" name="groundplane" builtin="checker" rgb1="0.9 0.9 0.9" rgb2="0.75 0.75 0.75" width="512" height="512"/>
+    <material name="groundplane" texture="groundplane" texrepeat="5 5" reflectance="0.2"/>
+    <material name="wood_mat" rgba="0.75 0.52 0.32 1"/>
+    <material name="scara_blue" rgba="0.0 0.4 0.8 1"/>
+    <material name="scara_dark_blue" rgba="0.0 0.1 0.4 1"/>
+    <material name="scara_grey" rgba="0.7 0.7 0.7 1"/>
+    <material name="conveyor_belt_mat" rgba="0.15 0.15 0.15 1"/>
+    <material name="conveyor_rail_mat" rgba="0.75 0.75 0.8 1"/>
+    <material name="yellow_puck_mat" rgba="1.0 0.85 0.0 1"/>
+
+    <!-- SCARA Meshes -->
+    <mesh name="base_link" file="base_link.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="column_link" file="column_link.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="shoulder_link" file="shoulder_link.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="forearm_link" file="forearm_link.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="wrist_link" file="wrist_link.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="left_finger_link" file="left_finger_link.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="right_finger_link" file="right_finger_link.stl" scale="0.001 0.001 0.001"/>
+  </asset>
+
+  <worldbody>
+    <!-- Ground Plane -->
+    <geom name="floor" size="3 3 0.1" type="plane" material="groundplane"/>
+    <light pos="0 0 3" dir="0 0 -1" directional="true"/>
+
+    <!-- Wooden Table Platform -->
+    <body name="table" pos="0 0 0">
+      <geom name="table_top" pos="0.25 0 0.10" size="0.55 0.425 0.10" type="box" material="wood_mat"/>
+    </body>
+
+    <!-- SCARA Robot Mounted Flat on Table Surface -->
+    <body name="base_link" pos="0.05 0.08 0.20">
+      <geom type="mesh" mesh="base_link" material="scara_blue"/>
+
+      <body name="column_link" pos="0.045 0 0.089">
+        <joint name="column_joint" pos="0 0 0" axis="0 0 1" range="-2.0 2.0" damping="10" armature="0.05"/>
+        <geom type="mesh" mesh="column_link" pos="-0.045 0 -0.089" material="scara_blue"/>
+
+        <body name="shoulder_link" pos="0 0 0.28">
+          <joint name="shoulder_joint" type="slide" pos="0 0 0" axis="0 0 1" range="-0.15 0.02" damping="50" armature="0.1"/>
+          <geom type="mesh" mesh="shoulder_link" pos="-0.045 0 -0.39" material="scara_blue"/>
+
+          <body name="forearm_link" pos="0.228 0 -0.04">
+            <joint name="forearm_joint" pos="0 0 0" axis="0 0 1" range="-2.0 2.0" damping="10" armature="0.05"/>
+            <geom type="mesh" mesh="forearm_link" pos="-0.273 0 -0.351" material="scara_blue"/>
+
+            <body name="wrist_link" pos="0.1365 0 -0.06">
+              <joint name="wrist_joint" pos="0 0 0" axis="0 0 1" range="-4.712 4.712" damping="5" armature="0.02"/>
+              <geom type="mesh" mesh="wrist_link" pos="-0.4095 0 -0.291" material="scara_dark_blue"/>
+
+              <body name="left_finger_link" pos="0 0.064 -0.0135">
+                <joint name="left_finger_joint" type="slide" pos="0 0 0" axis="0 1 0" range="-0.06 0.0" damping="10" armature="0.02"/>
+                <geom type="mesh" mesh="left_finger_link" pos="-0.409 -0.0626 -0.2775" material="scara_grey"/>
+              </body>
+
+              <body name="right_finger_link" pos="0 -0.064 -0.0135">
+                <joint name="right_finger_joint" type="slide" pos="0 0 0" axis="0 -1 0" range="-0.06 0.0" damping="10" armature="0.02"/>
+                <geom type="mesh" mesh="right_finger_link" pos="-0.409 0.0626 -0.2775" material="scara_grey"/>
+              </body>
+            </body>
+          </body>
+        </body>
+      </body>
+    </body>
+
+    <!-- Conveyor Belt Track -->
+    <body name="conveyor" pos="0.35 -0.18 0.20">
+      <geom name="conveyor_bed" pos="0 0 0.0175" size="0.41 0.11 0.0175" type="box" material="conveyor_belt_mat"/>
+      <geom name="left_rail" pos="0 0.12 0.0275" size="0.42 0.01 0.0275" type="box" material="conveyor_rail_mat"/>
+      <geom name="right_rail" pos="0 -0.12 0.0275" size="0.42 0.01 0.0275" type="box" material="conveyor_rail_mat"/>
+    </body>
+
+    <!-- Yellow Puck Payload -->
+    <body name="yellow_puck" pos="0.40 -0.18 0.235">
+      <freejoint/>
+      <geom name="puck_body" pos="0 0 0.0175" size="0.06 0.0175" type="cylinder" material="yellow_puck_mat" mass="0.1"/>
+      <geom name="puck_handle" pos="0 0 0.045" size="0.025 0.005" type="cylinder" material="yellow_puck_mat" quat="0.7071 0.7071 0 0"/>
+    </body>
+  </worldbody>
+
+  <actuator>
+    <position name="act_column" joint="column_joint" kp="500" kv="50"/>
+    <position name="act_shoulder" joint="shoulder_joint" kp="1000" kv="100"/>
+    <position name="act_forearm" joint="forearm_joint" kp="500" kv="50"/>
+    <position name="act_wrist" joint="wrist_joint" kp="200" kv="20"/>
+    <position name="act_left_finger" joint="left_finger_joint" kp="300" kv="30"/>
+    <position name="act_right_finger" joint="right_finger_joint" kp="300" kv="30"/>
+  </actuator>
+</mujoco>

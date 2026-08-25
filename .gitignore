@@ -1,3 +1,5 @@
 build/
 install/
 log/
+MJMODEL.TXT
+MUJOCO_LOG.TXT

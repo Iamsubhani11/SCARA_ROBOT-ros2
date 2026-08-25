@@ -1,0 +1,86 @@
+<?xml version="1.0" ?>
+<robot name="new_conveyor" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+    <material name="belt_dark">
+        <color rgba="0.15 0.15 0.15 1.0"/>
+    </material>
+    <material name="rail_metallic">
+        <color rgba="0.75 0.75 0.8 1.0"/>
+    </material>
+
+    <link name="conveyor_track_link">
+        <!-- Central Belt Bed -->
+        <visual>
+            <origin xyz="0 0 0.0175" rpy="0 0 0"/>
+            <geometry>
+                <box size="0.82 0.22 0.035"/>
+            </geometry>
+            <material name="belt_dark"/>
+        </visual>
+        <collision>
+            <origin xyz="0 0 0.0175" rpy="0 0 0"/>
+            <geometry>
+                <box size="0.82 0.22 0.035"/>
+            </geometry>
+        </collision>
+
+        <!-- Left Guard Rail -->
+        <visual>
+            <origin xyz="0 0.12 0.0275" rpy="0 0 0"/>
+            <geometry>
+                <box size="0.84 0.02 0.055"/>
+            </geometry>
+            <material name="rail_metallic"/>
+        </visual>
+        <collision>
+            <origin xyz="0 0.12 0.0275" rpy="0 0 0"/>
+            <geometry>
+                <box size="0.84 0.02 0.055"/>
+            </geometry>
+        </collision>
+
+        <!-- Right Guard Rail -->
+        <visual>
+            <origin xyz="0 -0.12 0.0275" rpy="0 0 0"/>
+            <geometry>
+                <box size="0.84 0.02 0.055"/>
+            </geometry>
+            <material name="rail_metallic"/>
+        </visual>
+        <collision>
+            <origin xyz="0 -0.12 0.0275" rpy="0 0 0"/>
+            <geometry>
+                <box size="0.84 0.02 0.055"/>
+            </geometry>
+        </collision>
+
+        <!-- Front End Roller -->
+        <visual>
+            <origin xyz="0.41 0 0.0175" rpy="1.5708 0 0"/>
+            <geometry>
+                <cylinder radius="0.02" length="0.22"/>
+            </geometry>
+            <material name="rail_metallic"/>
+        </visual>
+
+        <!-- Back End Roller -->
+        <visual>
+            <origin xyz="-0.41 0 0.0175" rpy="1.5708 0 0"/>
+            <geometry>
+                <cylinder radius="0.02" length="0.22"/>
+            </geometry>
+            <material name="rail_metallic"/>
+        </visual>
+
+        <inertial>
+            <origin xyz="0 0 0.0175" rpy="0 0 0"/>
+            <mass value="15.0"/>
+            <inertia ixx="0.1" ixy="0.0" ixz="0.0" iyy="0.1" iyz="0.0" izz="0.1"/>
+        </inertial>
+    </link>
+
+    <gazebo reference="conveyor_track_link">
+        <material>Gazebo/DarkGrey</material>
+    </gazebo>
+
+</robot>
