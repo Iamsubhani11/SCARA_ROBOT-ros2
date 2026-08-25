@@ -18,6 +18,8 @@ install(
     scripts/pick_and_place.py
     scripts/launch_mujoco.py
     scripts/scara_mujoco_teleop.py
+    scripts/gesture_control_mujoco.py
+    scripts/gesture_control_ros2.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
