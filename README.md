@@ -4,23 +4,42 @@ A comprehensive ROS 2 Humble workspace featuring a **4-DOF SCARA Robot** mounted
 
 ---
 
-## 🌟 Key Features
+## 🖐️ Hand Gesture Control Commands
 
-- 🦾 **4-DOF SCARA Robot Model**: Full kinematic chain including `column_joint`, `shoulder_joint` (prismatic Z-axis), `forearm_joint`, `wrist_joint`, and dual-finger parallel gripper.
-- 🪵 **Workspace Table Platform**: Rigid base platform (`table_link`) supporting tabletop mounting for the robot and conveyor track.
-- 📦 **Conveyor Belt System**: Transport conveyor belt track model with metallic side guard rails.
-- 🟡 **Payload Pick-and-Place**: Round yellow payload puck object with top ring handle.
-- 🖐️ **Finger Selection + Hand Tilt Gesture Control**:
-  - **Step 1**: Select target joint using number of extended fingers ($1$ to $5$).
-  - **Step 2**: Choose direction (Left / Right / Stop) by tilting hand left or right.
-- 🎮 **Dual Simulation Engines**:
-  - **Gazebo Sim 6 (Ignition Fortress)**: Full `ros2_control` hardware interface with `JointTrajectoryController` and `JointStateBroadcaster`.
-  - **MuJoCo 3.12**: Fast, stable physics engine backend with native 3D interactive viewer and GUI control sliders.
-- 🤖 **Automated Pick-and-Place State Machine**: 10-step trajectory state machine picking the yellow puck from the conveyor track and placing it on the wooden table platform.
+### 📦 1. Install Gesture Control Dependencies
+Run this command to install the required MediaPipe, OpenCV, and NumPy versions:
+
+```bash
+python3 -m pip install "numpy<2" "mediapipe==0.10.14" "opencv-python==4.9.0.80" mujoco
+```
 
 ---
 
-## 🖐️ Finger Selection + Hand Tilt Gesture Control Mapping
+### 🎮 2. Launch Gesture Control in MuJoCo Engine
+Run this command to launch real-time AI webcam hand gesture control in **MuJoCo**:
+
+```bash
+cd ~/scara_description_ws
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+ros2 run scara_description gesture_control_mujoco.py
+```
+
+---
+
+### 🤖 3. Launch Gesture Control in Gazebo (ROS 2)
+Run this command to launch real-time AI webcam hand gesture control in **Gazebo Ignition**:
+
+```bash
+cd ~/scara_description_ws
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+ros2 run scara_description gesture_control_ros2.py
+```
+
+---
+
+## 🖐️ Gesture Control Mapping & How to Operate
 
 ### Step 1: Select Active Joint by Extended Finger Count
 - ☝️ **1 Finger**: Select Joint 1 - **Base Column (`column_joint`)**
@@ -33,6 +52,19 @@ A comprehensive ROS 2 Humble workspace featuring a **4-DOF SCARA Robot** mounted
 - ↩️ **Tilt Hand LEFT**: Move Selected Joint **LEFT / DOWN / OPEN**
 - ⏹️ **Keep Hand LEVEL**: **HOLD / STOP** Selected Joint Position
 - ↪️ **Tilt Hand RIGHT**: Move Selected Joint **RIGHT / UP / CLOSE**
+
+---
+
+## 🌟 General Workspace Features
+
+- 🦾 **4-DOF SCARA Robot Model**: Full kinematic chain including `column_joint`, `shoulder_joint` (prismatic Z-axis), `forearm_joint`, `wrist_joint`, and dual-finger parallel gripper.
+- 🪵 **Workspace Table Platform**: Rigid base platform (`table_link`) supporting tabletop mounting for the robot and conveyor track.
+- 📦 **Conveyor Belt System**: Transport conveyor belt track model with metallic side guard rails.
+- 🟡 **Payload Pick-and-Place**: Round yellow payload puck object with top ring handle.
+- 🎮 **Dual Simulation Engines**:
+  - **Gazebo Sim 6 (Ignition Fortress)**: Full `ros2_control` hardware interface with `JointTrajectoryController` and `JointStateBroadcaster`.
+  - **MuJoCo 3.12**: Fast, stable physics engine backend with native 3D interactive viewer and GUI control sliders.
+- 🤖 **Automated Pick-and-Place State Machine**: 10-step trajectory state machine picking the yellow puck from the conveyor track and placing it on the wooden table platform.
 
 ---
 
@@ -67,79 +99,9 @@ scara_description_ws/
 
 ---
 
-## 🛠️ Prerequisites & Dependencies
+## 🛠️ Additional Commands
 
-### ROS 2 Packages (ROS 2 Humble)
-Ensure ROS 2 Humble desktop and controller packages are installed:
-
-```bash
-sudo apt update
-sudo apt install -y \
-  ros-humble-ros-gz \
-  ros-humble-ros-gz-sim \
-  ros-humble-ros-gz-bridge \
-  ros-humble-gz-ros2-control \
-  ros-humble-ros2-control \
-  ros-humble-ros2-controllers \
-  ros-humble-xacro \
-  ros-humble-robot-state-publisher
-```
-
-### Python Dependencies (for MuJoCo & Gesture Control)
-Install dependencies:
-
-```bash
-python3 -m pip install "numpy<2" "mediapipe==0.10.14" "opencv-python==4.9.0.80" mujoco
-```
-
----
-
-## 🚀 Installation & Building
-
-1. Clone the repository into your workspace:
-   ```bash
-   git clone https://github.com/Hemanth-08-RA/Scara_robot.git ~/scara_description_ws
-   ```
-
-2. Build the workspace using `colcon`:
-   ```bash
-   cd ~/scara_description_ws
-   source /opt/ros/humble/setup.bash
-   colcon build
-   ```
-
-3. Source the workspace environment overlay:
-   ```bash
-   source ~/scara_description_ws/install/setup.bash
-   ```
-
----
-
-## 🎯 Usage
-
-### 🖐️ 1. Finger Select + Hand Tilt Gesture Teleoperation
-
-#### Launch Gesture Teleoperation (MuJoCo):
-```bash
-cd ~/scara_description_ws
-source /opt/ros/humble/setup.bash
-source install/setup.bash
-ros2 run scara_description gesture_control_mujoco.py
-```
-
-#### Launch Gesture Teleoperation (Gazebo / ROS 2):
-```bash
-cd ~/scara_description_ws
-source /opt/ros/humble/setup.bash
-source install/setup.bash
-ros2 run scara_description gesture_control_ros2.py
-```
-
----
-
-### 2. Gazebo Ignition Simulation
-
-#### Launch Gazebo Sim & Robot Workspace:
+### Gazebo Simulation Launch:
 ```bash
 cd ~/scara_description_ws
 source /opt/ros/humble/setup.bash
@@ -147,20 +109,13 @@ source install/setup.bash
 ros2 launch scara_description gazebo.launch.py
 ```
 
-#### Run Automated Pick and Place Routine:
+### Automated Pick and Place Execution:
 ```bash
 ros2 run scara_description pick_and_place.py
 ```
 
----
-
-### 3. MuJoCo Simulation Backend
-
-#### Interactive GUI Control Mode (Sliders):
+### MuJoCo Interactive Slider GUI Mode:
 ```bash
-cd ~/scara_description_ws
-source /opt/ros/humble/setup.bash
-source install/setup.bash
 ros2 run scara_description launch_mujoco.py
 ```
 
