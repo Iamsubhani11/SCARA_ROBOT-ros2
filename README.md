@@ -1,61 +1,67 @@
-# SCARA Robot Simulation Workspace (ROS 2 Humble & MuJoCo,Gazebo)
+# SCARA Robot Simulation Workspace (ROS 2 Humble & MuJoCo)
 
-A comprehensive ROS 2 Humble workspace featuring a **4-DOF SCARA Robot** mounted on a wooden workspace table platform, complete with a **conveyor belt system**, **yellow puck payload object**, **automated pick-and-place state machine**, **Finger Selection + Hand Tilt Gesture Control**, and dual simulation engine support (**Gazebo Ignition Fortress** and **MuJoCo 3.12**).
-
----
-
-## 🖐️ Hand Gesture Control Commands
-
-### 📦 1. Install Gesture Control Dependencies
-Run this command to install the required MediaPipe, OpenCV, and NumPy versions:
-
-```bash
-python3 -m pip install "numpy<2" "mediapipe==0.10.14" "opencv-python==4.9.0.80" mujoco
-```
+A comprehensive ROS 2 Humble workspace featuring a **4-DOF SCARA Robot** mounted on a wooden workspace table platform, complete with a **conveyor belt system**, **yellow puck payload object**, **automated pick-and-place state machine**, **manual terminal & GUI teleoperation**, and dual simulation engine support (**Gazebo Ignition Fortress** and **MuJoCo 3.12**).
 
 ---
 
-### 🎮 2. Launch Gesture Control in MuJoCo Engine
-Run this command to launch real-time AI webcam hand gesture control in **MuJoCo**:
+## 🎮 Manual Teleoperation Options
+
+### 1. Terminal Keyboard Teleoperation (Gazebo)
+Control the SCARA robot joints manually using keyboard keys in **Gazebo Ignition**:
 
 ```bash
 cd ~/scara_description_ws
 source /opt/ros/humble/setup.bash
 source install/setup.bash
-ros2 run scara_description gesture_control_mujoco.py
+ros2 run scara_description scara_teleop.py
 ```
 
----
-
-### 🤖 3. Launch Gesture Control in Gazebo (ROS 2)
-Run this command to launch real-time AI webcam hand gesture control in **Gazebo Ignition**:
+### 2. Terminal Keyboard Teleoperation (MuJoCo)
+Control the SCARA robot joints manually using keyboard keys in **MuJoCo 3.12**:
 
 ```bash
 cd ~/scara_description_ws
 source /opt/ros/humble/setup.bash
 source install/setup.bash
-ros2 run scara_description gesture_control_ros2.py
+ros2 run scara_description scara_mujoco_teleop.py
 ```
 
----
-
-## 🖐️ Gesture Control Mapping & How to Operate
-
-### Step 1: Select Active Joint by Extended Finger Count
-- ☝️ **1 Finger**: Select Joint 1 - **Base Column (`column_joint`)**
-- ✌️ **2 Fingers**: Select Joint 2 - **Z-Axis Elevation (`shoulder_joint`)**
-- 🤟 **3 Fingers**: Select Joint 3 - **Forearm Elbow (`forearm_joint`)**
-- 🖖 **4 Fingers**: Select Joint 4 - **Wrist Rotation (`wrist_joint`)**
-- 🖐️ **5 Fingers**: Select Joint 5 - **Gripper (`left_finger_joint`)**
-
-### Step 2: Choose Direction by Tilting Hand
-- ↩️ **Tilt Hand LEFT**: Move Selected Joint **LEFT / DOWN / OPEN**
-- ⏹️ **Keep Hand LEVEL**: **HOLD / STOP** Selected Joint Position
-- ↪️ **Tilt Hand RIGHT**: Move Selected Joint **RIGHT / UP / CLOSE**
+**Keyboard Controls:**
+- **`W` / `S`**: Move Z-Axis UP / DOWN (`shoulder_joint`)
+- **`A` / `D`**: Rotate Base Column Left / Right (`column_joint`)
+- **`J` / `L`**: Rotate Forearm Left / Right (`forearm_joint`)
+- **`I` / `K`**: Rotate Wrist Orientation (`wrist_joint`)
+- **`G`**: CLOSE Gripper (Grasp yellow puck)
+- **`O`**: OPEN Gripper (Release yellow puck)
+- **`1`**: Pre-Pick Pose over conveyor puck
+- **`2`**: Lower Z-axis onto yellow puck
+- **`3`**: Drop-Off Pose over wooden table platform
+- **`R`**: RESET to Home position
 
 ---
 
-## 🌟 General Workspace Features
+### 3. Interactive GUI Control Sliders (MuJoCo)
+Launch native 3D MuJoCo viewer and drag interactive joint position sliders:
+
+```bash
+cd ~/scara_description_ws
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+ros2 run scara_description launch_mujoco.py
+```
+*Expand the **Control** tab on the top-right sidebar to drag joint position sliders manually.*
+
+---
+
+## 🖐️ AI Hand Gesture Control
+
+For AI Webcam Hand Gesture Control documentation, finger-to-joint mappings, and launch commands, see the dedicated gesture control directory:
+
+👉 **[gesture_control/README.md](gesture_control/README.md)**
+
+---
+
+## 🌟 Key Features
 
 - 🦾 **4-DOF SCARA Robot Model**: Full kinematic chain including `column_joint`, `shoulder_joint` (prismatic Z-axis), `forearm_joint`, `wrist_joint`, and dual-finger parallel gripper.
 - 🪵 **Workspace Table Platform**: Rigid base platform (`table_link`) supporting tabletop mounting for the robot and conveyor track.
@@ -74,6 +80,10 @@ ros2 run scara_description gesture_control_ros2.py
 scara_description_ws/
 ├── config/
 │   └── scara_controllers.yaml    # ros2_control JointTrajectoryController configuration
+├── gesture_control/              # Dedicated AI Hand Gesture Control folder
+│   ├── gesture_control_mujoco.py # Gesture teleop node for MuJoCo
+│   ├── gesture_control_ros2.py   # Gesture teleop node for Gazebo/ROS 2
+│   └── README.md                 # Dedicated Hand Gesture documentation & commands
 ├── launch/
 │   └── gazebo.launch.py          # Gazebo Ignition simulation launch file
 ├── meshes/
@@ -83,9 +93,7 @@ scara_description_ws/
 │   ├── scara_teleop.py           # Terminal teleop for Gazebo simulation
 │   ├── pick_and_place.py         # Automated pick-and-place state machine node
 │   ├── launch_mujoco.py          # Interactive MuJoCo simulation launcher & GUI mode
-│   ├── scara_mujoco_teleop.py    # Terminal teleop for MuJoCo simulation
-│   ├── gesture_control_mujoco.py # Finger Select + Hand Tilt Control for MuJoCo
-│   └── gesture_control_ros2.py   # Finger Select + Hand Tilt Control for Gazebo/ROS 2
+│   └── scara_mujoco_teleop.py    # Terminal teleop for MuJoCo simulation
 ├── urdf/
 │   ├── scara.urdf.xacro          # Root SCARA robot description file
 │   ├── arm.xacro                 # Kinematic joints, links, table base, & ros2_control
@@ -99,7 +107,55 @@ scara_description_ws/
 
 ---
 
-## 🛠️ Additional Commands
+## 🛠️ Prerequisites & Dependencies
+
+### ROS 2 Packages (ROS 2 Humble)
+Ensure ROS 2 Humble desktop and controller packages are installed:
+
+```bash
+sudo apt update
+sudo apt install -y \
+  ros-humble-ros-gz \
+  ros-humble-ros-gz-sim \
+  ros-humble-ros-gz-bridge \
+  ros-humble-gz-ros2-control \
+  ros-humble-ros2-control \
+  ros-humble-ros2-controllers \
+  ros-humble-xacro \
+  ros-humble-robot-state-publisher
+```
+
+### Python Dependencies
+Install dependencies:
+
+```bash
+python3 -m pip install "numpy<2" "mediapipe==0.10.14" "opencv-python==4.9.0.80" mujoco
+```
+
+---
+
+## 🚀 Installation & Building
+
+1. Clone the repository into your workspace:
+   ```bash
+   git clone https://github.com/Hemanth-08-RA/Scara_robot.git ~/scara_description_ws
+   ```
+
+2. Build the workspace using `colcon`:
+   ```bash
+   cd ~/scara_description_ws
+   source /opt/ros/humble/setup.bash
+   colcon build
+   ```
+
+3. Source the workspace environment overlay:
+   ```bash
+   source ~/scara_description_ws/install/setup.bash
+   ```
+
+---
+
+## 🎯 Usage Summary
 
 ### Gazebo Simulation Launch:
 ```bash
@@ -112,11 +168,6 @@ ros2 launch scara_description gazebo.launch.py
 ### Automated Pick and Place Execution:
 ```bash
 ros2 run scara_description pick_and_place.py
-```
-
-### MuJoCo Interactive Slider GUI Mode:
-```bash
-ros2 run scara_description launch_mujoco.py
 ```
 
 ---
