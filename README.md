@@ -1,6 +1,6 @@
 # SCARA Robot Simulation Workspace (ROS 2 Humble & MuJoCo,Gazebo)
 
-A comprehensive ROS 2 Humble workspace featuring a **4-DOF SCARA Robot** mounted on a wooden workspace table platform, complete with a **conveyor belt system**, **yellow puck payload object**, **automated pick-and-place state machine**, **AI Webcam Hand Gesture Teleoperation**, and dual simulation engine support (**Gazebo Ignition Fortress** and **MuJoCo 3.12**).
+A comprehensive ROS 2 Humble workspace featuring a **4-DOF SCARA Robot** mounted on a wooden workspace table platform, complete with a **conveyor belt system**, **yellow puck payload object**, **automated pick-and-place state machine**, **Full 5-Joint AI Hand Gesture Control**, and dual simulation engine support (**Gazebo Ignition Fortress** and **MuJoCo 3.12**).
 
 ---
 
@@ -10,7 +10,7 @@ A comprehensive ROS 2 Humble workspace featuring a **4-DOF SCARA Robot** mounted
 - 🪵 **Workspace Table Platform**: Rigid base platform (`table_link`) supporting tabletop mounting for the robot and conveyor track.
 - 📦 **Conveyor Belt System**: Transport conveyor belt track model with metallic side guard rails.
 - 🟡 **Payload Pick-and-Place**: Round yellow payload puck object with top ring handle.
-- 🖐️ **Intuitive AI Hand Gesture Teleoperation**: Real-time hand landmark tracking (MediaPipe & OpenCV) with **Low-Pass EMA Filtering** ($\alpha=0.15$) for jitter-free arm control.
+- 🖐️ **Full 5-Joint Hand Gesture Teleoperation**: Direct 1-to-1 hand landmark mapping controlling all 5 SCARA robot joints in real-time with **Low-Pass EMA Filtering** ($\alpha=0.18$) and custom OpenCV HUD.
 - 🎮 **Dual Simulation Engines**:
   - **Gazebo Sim 6 (Ignition Fortress)**: Full `ros2_control` hardware interface with `JointTrajectoryController` and `JointStateBroadcaster`.
   - **MuJoCo 3.12**: Fast, stable physics engine backend with native 3D interactive viewer and GUI control sliders.
@@ -18,15 +18,15 @@ A comprehensive ROS 2 Humble workspace featuring a **4-DOF SCARA Robot** mounted
 
 ---
 
-## 🖐️ Intuitive Gesture Control Mapping
+## 🖐️ Full 5-Joint Hand Gesture Control Mapping
 
-| Gesture | Action | Visual HUD Color |
-| :--- | :--- | :--- |
-| ✊ **Closed Fist / Pinch** | **CLOSE Gripper** (Grasp Yellow Puck) | 🔴 Red |
-| 🖐️ **Open Palm (5 Extended Fingers)** | **OPEN Gripper** (Release Puck) + Proportional Position Tracking | 🟢 Green |
-| ✌️ **Peace / Victory Sign (2 Fingers)** | **AUTO-ALIGN PRE-PICK POSE** (Aligns over Conveyor Track) | 🟣 Magenta |
-| 👌 **OK / 3 Extended Fingers** | **AUTO-ALIGN DROP-OFF POSE** (Aligns over Wooden Table) | 🔵 Cyan |
-| ☝️ **Pointing Index Finger** | **DIRECTIONAL TRACKING** (Point Left/Right & Up/Down) | 🟠 Orange |
+| Hand Feature / Landmark | SCARA Robot Joint | Range | Action |
+| :--- | :--- | :--- | :--- |
+| **Palm $X$ Position** | Joint 1: `column_joint` (Base Column) | $-1.8$ rad to $+1.8$ rad | Move hand **Left / Right** in camera view |
+| **Palm $Y$ Position** | Joint 2: `shoulder_joint` (Z-Axis Height) | $+0.02$ m to $-0.14$ m | Move hand **UP / DOWN** in camera view |
+| **Index Finger Stretch** | Joint 3: `forearm_joint` (Forearm Elbow) | $-1.2$ rad to $+1.5$ rad | **Extend / Curl** Index Finger |
+| **Hand Roll / Tilt Angle** | Joint 4: `wrist_joint` (Wrist Rotation) | $-3.14$ rad to $+3.14$ rad | **Tilt hand Left / Right** |
+| **Thumb-Index Pinch** | Joint 5: `left_finger_joint` (Gripper) | $-0.05$ m (Open) / $0.0$ m (Close) | **Pinch Thumb & Index** to GRASP puck |
 
 ---
 
@@ -46,8 +46,8 @@ scara_description_ws/
 │   ├── pick_and_place.py         # Automated pick-and-place state machine node
 │   ├── launch_mujoco.py          # Interactive MuJoCo simulation launcher & GUI mode
 │   ├── scara_mujoco_teleop.py    # Terminal teleop for MuJoCo simulation
-│   ├── gesture_control_mujoco.py # AI Webcam Gesture Control for MuJoCo (Smooth EMA Filter)
-│   └── gesture_control_ros2.py   # AI Webcam Gesture Control for Gazebo/ROS 2
+│   ├── gesture_control_mujoco.py # Full 5-Joint AI Gesture Control for MuJoCo
+│   └── gesture_control_ros2.py   # Full 5-Joint AI Gesture Control for Gazebo/ROS 2
 ├── urdf/
 │   ├── scara.urdf.xacro          # Root SCARA robot description file
 │   ├── arm.xacro                 # Kinematic joints, links, table base, & ros2_control
@@ -111,7 +111,7 @@ python3 -m pip install "numpy<2" "mediapipe==0.10.14" "opencv-python==4.9.0.80" 
 
 ## 🎯 Usage
 
-### 🖐️ 1. AI Webcam Hand Gesture Control
+### 🖐️ 1. Full 5-Joint AI Webcam Gesture Teleoperation
 
 #### Launch Gesture Teleoperation (MuJoCo):
 ```bash

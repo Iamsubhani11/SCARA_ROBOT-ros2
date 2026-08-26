@@ -16,36 +16,16 @@ def get_scene_xml_path():
         xml_path = '/home/hemanthros/scara_description_ws/urdf/scara_scene_mujoco.xml'
     return xml_path
 
-def count_extended_fingers(landmarks):
-    # Landmark indices for fingertips and PIP joints
-    tips = [4, 8, 12, 16, 20]
-    pips = [2, 6, 10, 14, 18]
-
-    extended = []
-    # Thumb (check horizontal / vertical offset)
-    if landmarks[tips[0]].x < landmarks[pips[0]].x:
-        extended.append(1)
-    else:
-        extended.append(0)
-
-    # 4 Fingers (Index, Middle, Ring, Pinky: tip above PIP joint in Y-axis)
-    for i in range(1, 5):
-        if landmarks[tips[i]].y < landmarks[pips[i]].y:
-            extended.append(1)
-        else:
-            extended.append(0)
-
-    return extended
-
 def main():
     print("==================================================================")
-    print("===  SCARA AI Hand Gesture Teleop Controller (MuJoCo)  ===")
+    print("===  SCARA Robot Full 5-Joint Hand Gesture Teleop (MuJoCo)  ===")
     print("==================================================================")
-    print(" 🖐️  OPEN PALM (5 Fingers)    : OPEN Gripper (Release Puck)")
-    print(" ✊ CLOSED FIST / PINCH       : CLOSE Gripper (Grasp Puck)")
-    print(" ✌️  PEACE SIGN (2 Fingers)    : Auto-Align Over Conveyor Puck")
-    print(" 👌 OK / 3 FINGERS             : Auto-Align Over Wooden Table")
-    print(" ☝️  POINTING INDEX FINGER     : Proportional Directional Mode")
+    print(" Joint Mapping:")
+    print("   ↔️  Hand Move Left / Right : Joint 1 - Base Column Rotation")
+    print("   ↕️  Hand Move Up / Down    : Joint 2 - Z-Axis Height (Elevation)")
+    print("   👈 Index Finger Bend/Extend: Joint 3 - Forearm Elbow Angle")
+    print("   🔄 Hand Tilt / Wrist Roll  : Joint 4 - Wrist Rotation")
+    print("   🤏 Thumb-Index Pinch / Fist: Joint 5 - Gripper Open / Close")
     print("==================================================================\n")
 
     xml_path = get_scene_xml_path()
@@ -69,22 +49,20 @@ def main():
     if not camera_available:
         print("[WARNING] Webcam camera index 0 not available.")
 
-    # Target joint positions
+    # Target joint positions (Raw & Smoothed)
     raw_column = 0.0
     raw_shoulder = 0.0
     raw_forearm = 0.0
     raw_wrist = 0.0
     raw_gripper = -0.05
 
-    # Smoothed joint positions (Exponential Moving Average)
     smooth_column = 0.0
     smooth_shoulder = 0.0
     smooth_forearm = 0.0
     smooth_wrist = 0.0
     smooth_gripper = -0.05
 
-    ALPHA = 0.15  # Low-pass filter smoothing coefficient (0.15 = buttery smooth)
-    gesture_name = "Neutral"
+    ALPHA = 0.18  # Low-pass EMA filter coefficient (0.18 = fast & smooth)
 
     with mujoco.viewer.launch_passive(model, data) as viewer:
         while viewer.is_running():
@@ -101,82 +79,70 @@ def main():
                             mp_draw.draw_landmarks(frame, hand_landmarks, mp_hands.HAND_CONNECTIONS)
 
                             lm = hand_landmarks.landmark
-                            extended = count_extended_fingers(lm)
-                            total_extended = sum(extended)
-
-                            wrist = lm[0]
+                            wrist_lm = lm[0]
                             index_tip = lm[8]
+                            index_mcp = lm[5]
                             thumb_tip = lm[4]
+                            pinky_mcp = lm[17]
 
-                            # Distance between Thumb Tip (4) and Index Tip (8)
+                            # 1. Joint 1: Base Column (Hand X Position: 0.15 to 0.85 -> -1.8 to 1.8 rad)
+                            hand_x = np.clip(wrist_lm.x, 0.15, 0.85)
+                            raw_column = float(np.interp(hand_x, [0.15, 0.85], [-1.8, 1.8]))
+
+                            # 2. Joint 2: Z-Axis Height (Hand Y Position: 0.20 to 0.80 -> 0.02 to -0.14 m)
+                            hand_y = np.clip(wrist_lm.y, 0.20, 0.80)
+                            raw_shoulder = float(np.interp(hand_y, [0.20, 0.80], [0.02, -0.14]))
+
+                            # 3. Joint 3: Forearm Elbow (Distance from Wrist to Index Tip: 0.15 to 0.45 -> -1.2 to 1.5 rad)
+                            index_dist = np.hypot((index_tip.x - wrist_lm.x) * w, (index_tip.y - wrist_lm.y) * h) / w
+                            index_dist = np.clip(index_dist, 0.15, 0.45)
+                            raw_forearm = float(np.interp(index_dist, [0.15, 0.45], [-1.2, 1.5]))
+
+                            # 4. Joint 4: Wrist Rotation (Hand Tilt / Roll Angle between Index MCP and Pinky MCP)
+                            dx = (pinky_mcp.x - index_mcp.x) * w
+                            dy = (pinky_mcp.y - index_mcp.y) * h
+                            hand_roll = np.arctan2(dy, dx)
+                            raw_wrist = float(np.clip(hand_roll * 2.0, -3.14, 3.14))
+
+                            # 5. Joint 5: Gripper Open/Close (Pinch Distance between Thumb Tip & Index Tip)
                             pinch_dist = np.hypot((thumb_tip.x - index_tip.x) * w, (thumb_tip.y - index_tip.y) * h)
+                            if pinch_dist < 40:
+                                raw_gripper = 0.0  # CLOSED (GRASP)
+                                gripper_status = "CLOSED (GRASPING PUCK)"
+                                status_color = (0, 0, 255)
+                            else:
+                                raw_gripper = -0.05  # OPEN (RELEASE)
+                                gripper_status = "OPEN (RELEASED)"
+                                status_color = (0, 255, 0)
 
-                            # Gesture State Machine Logic
-                            if pinch_dist < 40 or total_extended == 0:
-                                gesture_name = "✊ FIST / PINCH: GRASP PUCK"
-                                raw_gripper = 0.0
-                                color_bg = (0, 0, 255)  # Red HUD
-
-                            elif total_extended >= 4:
-                                gesture_name = "🖐️ OPEN PALM: RELEASE PUCK"
-                                raw_gripper = -0.05
-                                color_bg = (0, 255, 0)  # Green HUD
-
-                                # Map hand position smoothly
-                                hand_x = np.clip(wrist.x, 0.15, 0.85)
-                                raw_column = float(np.interp(hand_x, [0.15, 0.85], [-1.8, 1.8]))
-
-                                hand_y = np.clip(wrist.y, 0.2, 0.8)
-                                raw_shoulder = float(np.interp(hand_y, [0.2, 0.8], [0.02, -0.14]))
-
-                            elif total_extended == 2 and extended[1] == 1 and extended[2] == 1:
-                                gesture_name = "✌️ PEACE: ALIGN OVER CONVEYOR"
-                                raw_column = -0.32
-                                raw_forearm = 0.75
-                                raw_shoulder = 0.0
-                                color_bg = (255, 0, 255)  # Magenta HUD
-
-                            elif total_extended == 3 and extended[1] == 1 and extended[2] == 1 and extended[3] == 1:
-                                gesture_name = "👌 OK: ALIGN OVER TABLE"
-                                raw_column = 0.785
-                                raw_forearm = 0.85
-                                raw_shoulder = 0.0
-                                color_bg = (255, 255, 0)  # Cyan HUD
-
-                            elif extended[1] == 1:  # Pointing Index Finger
-                                gesture_name = "☝️ POINTING: DIRECTIONAL TRACKING"
-                                hand_x = np.clip(index_tip.x, 0.15, 0.85)
-                                raw_column = float(np.interp(hand_x, [0.15, 0.85], [-1.8, 1.8]))
-
-                                hand_y = np.clip(index_tip.y, 0.2, 0.8)
-                                raw_shoulder = float(np.interp(hand_y, [0.2, 0.8], [0.02, -0.14]))
-                                color_bg = (0, 165, 255)  # Orange HUD
-
-                            # Apply EMA Low-Pass Filter for Ultra-Smooth Motion
+                            # Apply EMA Low-Pass Filter
                             smooth_column = ALPHA * raw_column + (1 - ALPHA) * smooth_column
                             smooth_shoulder = ALPHA * raw_shoulder + (1 - ALPHA) * smooth_shoulder
                             smooth_forearm = ALPHA * raw_forearm + (1 - ALPHA) * smooth_forearm
                             smooth_wrist = ALPHA * raw_wrist + (1 - ALPHA) * smooth_wrist
                             smooth_gripper = ALPHA * raw_gripper + (1 - ALPHA) * smooth_gripper
 
-                            # Draw Visual HUD Overlay
-                            cv2.rectangle(frame, (10, 10), (w - 10, 60), color_bg, -1)
-                            cv2.putText(frame, gesture_name, (20, 45),
-                                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+                            # Draw Visual HUD Overlay with All 5 Joint Statuses
+                            cv2.rectangle(frame, (10, 10), (w - 10, 200), (30, 30, 30), -1)
+                            cv2.putText(frame, "SCARA AI 5-Joint Gesture Controller", (20, 35),
+                                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
 
-                            # Status Bars
-                            cv2.putText(frame, f"Base Column: {smooth_column:.2f} rad", (20, 90),
-                                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
-                            cv2.putText(frame, f"Z-Height:    {smooth_shoulder:.3f} m", (20, 120),
-                                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
-                            cv2.putText(frame, f"Gripper:     {'CLOSED' if smooth_gripper > -0.02 else 'OPEN'}", (20, 150),
-                                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0) if smooth_gripper <= -0.02 else (0, 0, 255), 2)
+                            cv2.putText(frame, f"1. Base Column  : {smooth_column:+.2f} rad (Move Left/Right)", (20, 65),
+                                        cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 1)
+                            cv2.putText(frame, f"2. Z-Axis Height: {smooth_shoulder:+.3f} m   (Move Up/Down)", (20, 90),
+                                        cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 1)
+                            cv2.putText(frame, f"3. Forearm Angle: {smooth_forearm:+.2f} rad (Index Stretch)", (20, 115),
+                                        cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 1)
+                            cv2.putText(frame, f"4. Wrist Roll   : {smooth_wrist:+.2f} rad (Hand Tilt)", (20, 140),
+                                        cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 1)
+                            cv2.putText(frame, f"5. Gripper State: {gripper_status}", (20, 175),
+                                        cv2.FONT_HERSHEY_SIMPLEX, 0.65, status_color, 2)
 
                     cv2.imshow("SCARA AI Hand Gesture Teleoperation", frame)
                     if cv2.waitKey(1) & 0xFF == 27:  # ESC to exit
                         break
 
-            # Update SCARA actuators in MuJoCo with smoothed targets
+            # Update SCARA actuators in MuJoCo
             data.ctrl[0] = smooth_column
             data.ctrl[1] = smooth_shoulder
             data.ctrl[2] = smooth_forearm
