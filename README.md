@@ -1,6 +1,6 @@
 # SCARA Robot Simulation Workspace (ROS 2 Humble & MuJoCo,Gazebo)
 
-A comprehensive ROS 2 Humble workspace featuring a **4-DOF SCARA Robot** mounted on a wooden workspace table platform, complete with a **conveyor belt system**, **yellow puck payload object**, **automated pick-and-place state machine**, **AI Webcam Hand Gesture Control**, and dual simulation engine support (**Gazebo Ignition Fortress** and **MuJoCo 3.12**).
+A comprehensive ROS 2 Humble workspace featuring a **4-DOF SCARA Robot** mounted on a wooden workspace table platform, complete with a **conveyor belt system**, **yellow puck payload object**, **automated pick-and-place state machine**, **AI Webcam Hand Gesture Teleoperation**, and dual simulation engine support (**Gazebo Ignition Fortress** and **MuJoCo 3.12**).
 
 ---
 
@@ -10,7 +10,7 @@ A comprehensive ROS 2 Humble workspace featuring a **4-DOF SCARA Robot** mounted
 - 🪵 **Workspace Table Platform**: Rigid base platform (`table_link`) supporting tabletop mounting for the robot and conveyor track.
 - 📦 **Conveyor Belt System**: Transport conveyor belt track model with metallic side guard rails.
 - 🟡 **Payload Pick-and-Place**: Round yellow payload puck object with top ring handle.
-- 🖐️ **AI Webcam Hand Gesture Teleoperation**: Real-time hand tracking (OpenCV & MediaPipe) controlling joint angles, Z-axis height, and pinch grasping.
+- 🖐️ **Intuitive AI Hand Gesture Teleoperation**: Real-time hand landmark tracking (MediaPipe & OpenCV) with **Low-Pass EMA Filtering** ($\alpha=0.15$) for jitter-free arm control.
 - 🎮 **Dual Simulation Engines**:
   - **Gazebo Sim 6 (Ignition Fortress)**: Full `ros2_control` hardware interface with `JointTrajectoryController` and `JointStateBroadcaster`.
   - **MuJoCo 3.12**: Fast, stable physics engine backend with native 3D interactive viewer and GUI control sliders.
@@ -18,13 +18,15 @@ A comprehensive ROS 2 Humble workspace featuring a **4-DOF SCARA Robot** mounted
 
 ---
 
-## 🖐️ Hand Gesture Control Mapping
+## 🖐️ Intuitive Gesture Control Mapping
 
-Using MediaPipe 21 hand landmark tracking via webcam:
-- ↔️ **Move Hand Left / Right**: Rotates SCARA Base Column (`column_joint`).
-- ↕️ **Move Hand Up / Down**: Moves SCARA Z-Axis Height (`shoulder_joint`).
-- 🤏 **Pinch / Closed Fist**: Closes gripper to grasp yellow puck.
-- 🖐️ **Open Palm (5 Fingers)**: Opens gripper to release payload.
+| Gesture | Action | Visual HUD Color |
+| :--- | :--- | :--- |
+| ✊ **Closed Fist / Pinch** | **CLOSE Gripper** (Grasp Yellow Puck) | 🔴 Red |
+| 🖐️ **Open Palm (5 Extended Fingers)** | **OPEN Gripper** (Release Puck) + Proportional Position Tracking | 🟢 Green |
+| ✌️ **Peace / Victory Sign (2 Fingers)** | **AUTO-ALIGN PRE-PICK POSE** (Aligns over Conveyor Track) | 🟣 Magenta |
+| 👌 **OK / 3 Extended Fingers** | **AUTO-ALIGN DROP-OFF POSE** (Aligns over Wooden Table) | 🔵 Cyan |
+| ☝️ **Pointing Index Finger** | **DIRECTIONAL TRACKING** (Point Left/Right & Up/Down) | 🟠 Orange |
 
 ---
 
@@ -44,7 +46,7 @@ scara_description_ws/
 │   ├── pick_and_place.py         # Automated pick-and-place state machine node
 │   ├── launch_mujoco.py          # Interactive MuJoCo simulation launcher & GUI mode
 │   ├── scara_mujoco_teleop.py    # Terminal teleop for MuJoCo simulation
-│   ├── gesture_control_mujoco.py # AI Webcam Gesture Control for MuJoCo
+│   ├── gesture_control_mujoco.py # AI Webcam Gesture Control for MuJoCo (Smooth EMA Filter)
 │   └── gesture_control_ros2.py   # AI Webcam Gesture Control for Gazebo/ROS 2
 ├── urdf/
 │   ├── scara.urdf.xacro          # Root SCARA robot description file
@@ -78,10 +80,10 @@ sudo apt install -y \
 ```
 
 ### Python Dependencies (for MuJoCo & Gesture Control)
-Install MuJoCo, OpenCV, and MediaPipe:
+Install dependencies:
 
 ```bash
-python3 -m pip install mujoco opencv-python mediapipe
+python3 -m pip install "numpy<2" "mediapipe==0.10.14" "opencv-python==4.9.0.80" mujoco
 ```
 
 ---
