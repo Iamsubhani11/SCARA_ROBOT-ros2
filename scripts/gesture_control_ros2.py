@@ -10,6 +10,24 @@ from rclpy.node import Node
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 import mediapipe as mp
 
+def count_extended_fingers(lm):
+    tips = [4, 8, 12, 16, 20]
+    pips = [2, 6, 10, 14, 18]
+
+    extended = []
+    if abs(lm[4].x - lm[0].x) > 0.08 and (lm[4].x > lm[2].x or lm[4].y < lm[3].y):
+        extended.append(1)
+    else:
+        extended.append(0)
+
+    for i in range(1, 5):
+        if lm[tips[i]].y < lm[pips[i]].y:
+            extended.append(1)
+        else:
+            extended.append(0)
+
+    return extended
+
 class SCARAGestureControllerROS2(Node):
     def __init__(self):
         super().__init__('scara_gesture_controller_ros2')
@@ -18,7 +36,7 @@ class SCARAGestureControllerROS2(Node):
         self.gripper_pub = self.create_publisher(JointTrajectory, '/gripper_controller/joint_trajectory', 10)
 
         self.get_logger().info("==================================================================")
-        self.get_logger().info("=== SCARA AI 5-Joint Gesture ROS 2 Controller (Gazebo) Started ===")
+        self.get_logger().info("=== SCARA Finger Select + Hand Tilt ROS 2 Controller Started ===")
         self.get_logger().info("==================================================================")
 
         # Initialize MediaPipe
@@ -36,20 +54,18 @@ class SCARAGestureControllerROS2(Node):
         if not self.cap.isOpened():
             self.get_logger().warn("Webcam camera index 0 not detected.")
 
-        # Target states
-        self.raw_column = 0.0
-        self.raw_shoulder = 0.0
-        self.raw_forearm = 0.0
-        self.raw_wrist = 0.0
-        self.raw_gripper = -0.05
+        # Current Joint Positions
+        self.curr_column = 0.0
+        self.curr_shoulder = 0.0
+        self.curr_forearm = 0.0
+        self.curr_wrist = 0.0
+        self.curr_gripper = -0.05
 
-        self.smooth_column = 0.0
-        self.smooth_shoulder = 0.0
-        self.smooth_forearm = 0.0
-        self.smooth_wrist = 0.0
-        self.smooth_gripper = -0.05
-
-        self.ALPHA = 0.18
+        # Speed constants
+        self.SPEED_COLUMN = 0.025
+        self.SPEED_SHOULDER = 0.002
+        self.SPEED_FOREARM = 0.025
+        self.SPEED_WRIST = 0.035
 
         self.timer = self.create_timer(0.05, self.process_frame)
 
@@ -66,72 +82,83 @@ class SCARAGestureControllerROS2(Node):
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         results = self.hands.process(rgb_frame)
 
+        selected_joint = "None (No Hand Detected)"
+        direction_str = "HOLD"
+        status_color = (200, 200, 200)
+
         if results.multi_hand_landmarks:
             for hand_landmarks in results.multi_hand_landmarks:
                 self.mp_draw.draw_landmarks(frame, hand_landmarks, self.mp_hands.HAND_CONNECTIONS)
 
                 lm = hand_landmarks.landmark
-                wrist_lm = lm[0]
-                index_tip = lm[8]
+                extended = count_extended_fingers(lm)
+                total_fingers = sum(extended)
+
                 index_mcp = lm[5]
-                thumb_tip = lm[4]
                 pinky_mcp = lm[17]
 
-                # 1. Joint 1: Base Column (Hand X Position: 0.15 to 0.85 -> -1.8 to 1.8 rad)
-                hand_x = np.clip(wrist_lm.x, 0.15, 0.85)
-                self.raw_column = float(np.interp(hand_x, [0.15, 0.85], [-1.8, 1.8]))
-
-                # 2. Joint 2: Z-Axis Height (Hand Y Position: 0.20 to 0.80 -> 0.02 to -0.14 m)
-                hand_y = np.clip(wrist_lm.y, 0.20, 0.80)
-                self.raw_shoulder = float(np.interp(hand_y, [0.20, 0.80], [0.02, -0.14]))
-
-                # 3. Joint 3: Forearm Elbow (Distance from Wrist to Index Tip: 0.15 to 0.45 -> -1.2 to 1.5 rad)
-                index_dist = np.hypot((index_tip.x - wrist_lm.x) * w, (index_tip.y - wrist_lm.y) * h) / w
-                index_dist = np.clip(index_dist, 0.15, 0.45)
-                self.raw_forearm = float(np.interp(index_dist, [0.15, 0.45], [-1.2, 1.5]))
-
-                # 4. Joint 4: Wrist Rotation (Hand Tilt / Roll Angle between Index MCP and Pinky MCP)
+                # Hand Tilt / Roll Angle
                 dx = (pinky_mcp.x - index_mcp.x) * w
                 dy = (pinky_mcp.y - index_mcp.y) * h
-                hand_roll = np.arctan2(dy, dx)
-                self.raw_wrist = float(np.clip(hand_roll * 2.0, -3.14, 3.14))
+                roll_angle = np.arctan2(dy, dx)
 
-                # 5. Joint 5: Gripper Open/Close (Pinch Distance between Thumb Tip & Index Tip)
-                pinch_dist = np.hypot((thumb_tip.x - index_tip.x) * w, (thumb_tip.y - index_tip.y) * h)
-                if pinch_dist < 40:
-                    self.raw_gripper = 0.0  # CLOSED (GRASP)
-                    gripper_status = "CLOSED (GRASPING PUCK)"
-                    status_color = (0, 0, 255)
-                else:
-                    self.raw_gripper = -0.05  # OPEN (RELEASE)
-                    gripper_status = "OPEN (RELEASED)"
+                # Determine Direction from Hand Tilt
+                if roll_angle > 0.25:
+                    direction = 1
+                    direction_str = "▶️ RIGHT / UP / CLOSE"
                     status_color = (0, 255, 0)
+                elif roll_angle < -0.25:
+                    direction = -1
+                    direction_str = "◀️ LEFT / DOWN / OPEN"
+                    status_color = (0, 165, 255)
+                else:
+                    direction = 0
+                    direction_str = "⏹️ HOLD POSITION"
+                    status_color = (255, 255, 0)
 
-                # EMA Low-Pass Filter
-                self.smooth_column = self.ALPHA * self.raw_column + (1 - self.ALPHA) * self.smooth_column
-                self.smooth_shoulder = self.ALPHA * self.raw_shoulder + (1 - self.ALPHA) * self.smooth_shoulder
-                self.smooth_forearm = self.ALPHA * self.raw_forearm + (1 - self.ALPHA) * self.smooth_forearm
-                self.smooth_wrist = self.ALPHA * self.raw_wrist + (1 - self.ALPHA) * self.smooth_wrist
-                self.smooth_gripper = self.ALPHA * self.raw_gripper + (1 - self.ALPHA) * self.smooth_gripper
+                # Step 1: Select Joint by Finger Count & Step 2: Apply Motion Direction
+                if total_fingers == 1:
+                    selected_joint = "1. Base Column (column_joint)"
+                    self.curr_column += direction * self.SPEED_COLUMN
+                    self.curr_column = float(np.clip(self.curr_column, -2.0, 2.0))
+
+                elif total_fingers == 2:
+                    selected_joint = "2. Z-Axis Elevation (shoulder_joint)"
+                    self.curr_shoulder += direction * self.SPEED_SHOULDER
+                    self.curr_shoulder = float(np.clip(self.curr_shoulder, -0.15, 0.02))
+
+                elif total_fingers == 3:
+                    selected_joint = "3. Forearm Elbow (forearm_joint)"
+                    self.curr_forearm += direction * self.SPEED_FOREARM
+                    self.curr_forearm = float(np.clip(self.curr_forearm, -2.0, 2.0))
+
+                elif total_fingers == 4:
+                    selected_joint = "4. Wrist Rotation (wrist_joint)"
+                    self.curr_wrist += direction * self.SPEED_WRIST
+                    self.curr_wrist = float(np.clip(self.curr_wrist, -4.71, 4.71))
+
+                elif total_fingers == 5:
+                    selected_joint = "5. Gripper (left_finger_joint)"
+                    if direction == 1:
+                        self.curr_gripper = 0.0
+                    elif direction == -1:
+                        self.curr_gripper = -0.05
 
                 # Publish Trajectory to ROS 2 Controller Topics
-                self.publish_targets(self.smooth_column, self.smooth_shoulder, self.smooth_forearm, self.smooth_wrist, self.smooth_gripper)
+                self.publish_targets(self.curr_column, self.curr_shoulder, self.curr_forearm, self.curr_wrist, self.curr_gripper)
 
-                # Draw Visual HUD Overlay with All 5 Joint Statuses
-                cv2.rectangle(frame, (10, 10), (w - 10, 200), (30, 30, 30), -1)
-                cv2.putText(frame, "SCARA ROS 2 5-Joint Gesture Controller", (20, 35),
+                # Visual HUD Panel
+                cv2.rectangle(frame, (10, 10), (w - 10, 190), (30, 30, 30), -1)
+                cv2.putText(frame, "SCARA ROS 2 Finger Select + Tilt Controller", (20, 35),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
 
-                cv2.putText(frame, f"1. Base Column  : {self.smooth_column:+.2f} rad (Move Left/Right)", (20, 65),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 1)
-                cv2.putText(frame, f"2. Z-Axis Height: {self.smooth_shoulder:+.3f} m   (Move Up/Down)", (20, 90),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 1)
-                cv2.putText(frame, f"3. Forearm Angle: {self.smooth_forearm:+.2f} rad (Index Stretch)", (20, 115),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 1)
-                cv2.putText(frame, f"4. Wrist Roll   : {self.smooth_wrist:+.2f} rad (Hand Tilt)", (20, 140),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 1)
-                cv2.putText(frame, f"5. Gripper State: {gripper_status}", (20, 175),
+                cv2.putText(frame, f"Fingers: {total_fingers} -> Active Joint: {selected_joint}", (20, 65),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+                cv2.putText(frame, f"Hand Tilt: {direction_str}", (20, 95),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.65, status_color, 2)
+
+                cv2.putText(frame, f"Col: {self.curr_column:+.2f}r | Z: {self.curr_shoulder:+.3f}m | Forearm: {self.curr_forearm:+.2f}r | Wrist: {self.curr_wrist:+.2f}r | Grip: {'CLOSED' if self.curr_gripper > -0.02 else 'OPEN'}",
+                            (20, 135), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (200, 200, 200), 1)
 
         cv2.imshow("SCARA ROS 2 AI Gesture Controller", frame)
         cv2.waitKey(1)
