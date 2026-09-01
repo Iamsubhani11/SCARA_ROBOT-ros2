@@ -13,7 +13,7 @@ def get_scene_xml_path():
     pkg_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     xml_path = os.path.join(pkg_dir, 'urdf', 'scara_scene_mujoco.xml')
     if not os.path.exists(xml_path):
-        xml_path = '/home/hemanthros/scara_description_ws/urdf/scara_scene_mujoco.xml'
+        xml_path = '/home/robotics/Scara_robot/urdf/scara_scene_mujoco.xml'
     return xml_path
 
 def count_extended_fingers(lm):

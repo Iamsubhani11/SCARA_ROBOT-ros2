@@ -48,7 +48,7 @@
 
         <body name="shoulder_link" pos="0 0 0.28">
           <joint name="shoulder_joint" type="slide" pos="0 0 0" axis="0 0 1" range="-0.15 0.02" damping="50" armature="0.1"/>
-          <geom type="mesh" mesh="shoulder_link" pos="-0.045 0 -0.39" material="scara_blue"/>
+          <geom type="mesh" mesh="shoulder_link" pos="-0.059954333 -0.059974857 -0.390000" material="scara_blue"/>
 
           <body name="forearm_link" pos="0.228 0 -0.04">
             <joint name="forearm_joint" pos="0 0 0" axis="0 0 1" range="-2.0 2.0" damping="10" armature="0.05"/>
