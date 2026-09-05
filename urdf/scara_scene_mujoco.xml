@@ -40,11 +40,11 @@
 
     <!-- SCARA Robot Mounted Flat on Table Surface -->
     <body name="base_link" pos="0.05 0.08 0.20">
-      <geom type="mesh" mesh="base_link" material="scara_blue"/>
+      <geom type="mesh" mesh="base_link" material="scara_blue" contype="1" conaffinity="1"/>
 
       <body name="column_link" pos="0.045 0 0.089">
         <joint name="column_joint" pos="0 0 0" axis="0 0 1" range="-2.0 2.0" damping="10" armature="0.05"/>
-        <geom type="mesh" mesh="column_link" pos="-0.045 0 -0.089" material="scara_blue"/>
+        <geom type="mesh" mesh="column_link" pos="-0.045 0 -0.089" material="scara_blue" contype="2" conaffinity="2"/>
 
         <body name="shoulder_link" pos="0 0 0.28">
           <joint name="shoulder_joint" type="slide" pos="0 0 0" axis="0 0 1" range="-0.15 0.02" damping="50" armature="0.1"/>
@@ -89,7 +89,12 @@
   </worldbody>
 
   <actuator>
-    <position name="act_column" joint="column_joint" kp="500" kv="50"/>
+    <position name="act_column"
+          joint="column_joint"
+          kp="500"
+          kv="50"
+          ctrlrange="-2.0 2.0"
+          forcerange="-100 100"/>
     <position name="act_shoulder" joint="shoulder_joint" kp="1000" kv="100"/>
     <position name="act_forearm" joint="forearm_joint" kp="500" kv="50"/>
     <position name="act_wrist" joint="wrist_joint" kp="200" kv="20"/>
