@@ -107,7 +107,7 @@
     <!-- ── SHOULDER ──────────────────────────────────── -->
     <link name="shoulder_link">
         <visual>
-            <origin xyz="-0.045 0 -0.39" rpy="0 0 0"/>
+            <origin xyz="-0.059954333 -0.059974857 -0.390000" rpy="0 0 0"/>
             <geometry>
                 <mesh filename="package://scara_description/meshes/shoulder_link.stl"
                       scale="0.001 0.001 0.001"/>
@@ -115,7 +115,7 @@
             <material name="scara_mid_blue"/>
         </visual>
         <collision>
-            <origin xyz="-0.045 0 -0.39" rpy="0 0 0"/>
+            <origin xyz="-0.059954333 -0.59974857 -0.390000" rpy="0 0 0"/>
             <geometry>
                 <mesh filename="package://scara_description/meshes/shoulder_link.stl"
                       scale="0.001 0.001 0.001"/>
@@ -282,7 +282,6 @@
         <child link="right_finger_link"/>
         <axis xyz="0 -1 0"/>
         <limit lower="-0.06" upper="0.0" effort="100.0" velocity="0.5"/>
-        <mimic joint="left_finger_joint" multiplier="1.0" offset="0.0"/>
     </joint>
 
     <!-- DUMMY JOINT FOR MOVEIT2-->
@@ -322,6 +321,11 @@
             <state_interface name="position"/>
             <state_interface name="velocity"/>
         </joint>
+        <joint name="right_finger_joint">
+    <command_interface name="position"/>
+    <state_interface name="position"/>
+    <state_interface name="velocity"/>
+</joint>
     </ros2_control>
 
     <gazebo reference="table_link">
@@ -329,9 +333,11 @@
     </gazebo>
 
     <gazebo>
-        <plugin filename="ign_ros2_control-system" name="ign_ros2_control::IgnitionROS2ControlPlugin">
-            <parameters>$(find scara_description)/config/scara_controllers.yaml</parameters>
-        </plugin>
-    </gazebo>
+    <plugin filename="gz_ros2_control-system"
+            name="gz_ros2_control::GazeboSimROS2ControlPlugin">
+        <parameters>$(find scara_description)/config/scara_controllers.yaml</parameters>
+    </plugin>
+</gazebo>
 
 </robot>
+

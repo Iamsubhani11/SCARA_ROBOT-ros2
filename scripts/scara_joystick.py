@@ -47,7 +47,12 @@ class ScaraJoystick(Node):
             'wrist_joint'
         ]
 
-        self.gripper_joint = ['left_finger_joint']
+        # Both gripper fingers are commanded directly.
+        # This avoids relying on Gazebo mimic support.
+        self.gripper_joint = [
+            'left_finger_joint',
+            'right_finger_joint'
+        ]
 
         # ============================================================
         # Current target positions
@@ -57,7 +62,12 @@ class ScaraJoystick(Node):
         self.shoulder = 0.0
         self.forearm = 0.0
         self.wrist = 0.0
+
+        # Closed position
         self.gripper = -0.05
+
+        # Gripper command is only published when its target changes
+        self.gripper_changed = True
 
         # ============================================================
         # Joint limits
@@ -96,13 +106,19 @@ class ScaraJoystick(Node):
             self.control_loop
         )
 
+        # ============================================================
         # Latest joystick values
+        # ============================================================
+
         self.axes = [0.0] * 8
         self.buttons = [0] * 11
 
-        self.last_gripper_button = 0
         self.last_home_button = 0
         self.last_stop_button = 0
+
+        # ============================================================
+        # Information
+        # ============================================================
 
         self.get_logger().info(
             '======================================================'
@@ -212,9 +228,9 @@ class ScaraJoystick(Node):
         )
 
         # ------------------------------------------------------------
-        # Joint 2 - Z / Shoulder
+        # Joint 2 - Shoulder / Z
         #
-        # Joystick Y is normally:
+        # Joystick:
         # UP   = -1
         # DOWN = +1
         #
@@ -258,22 +274,36 @@ class ScaraJoystick(Node):
         # ------------------------------------------------------------
 
         # A = Button 0
+        # CLOSE GRIPPER
         if self.buttons[0] == 1:
-            self.gripper = 0.0
+
+            if self.gripper != self.GRIPPER_MIN:
+                self.gripper = self.GRIPPER_MIN
+                self.gripper_changed = True
 
         # B = Button 1
+        # OPEN GRIPPER
         if self.buttons[1] == 1:
-            self.gripper = -0.05
 
+            if self.gripper != self.GRIPPER_MAX:
+                self.gripper = self.GRIPPER_MAX
+                self.gripper_changed = True
+
+        # ------------------------------------------------------------
         # Y = Button 3
-        # Home only when button is newly pressed
+        # HOME
+        # ------------------------------------------------------------
+
         if self.buttons[3] == 1 and self.last_home_button == 0:
 
             self.column = 0.0
             self.shoulder = 0.0
             self.forearm = 0.0
             self.wrist = 0.0
+
+            # Home = closed gripper
             self.gripper = -0.05
+            self.gripper_changed = True
 
             self.get_logger().info(
                 'HOME POSITION'
@@ -284,9 +314,7 @@ class ScaraJoystick(Node):
         # ------------------------------------------------------------
         # X = Button 2
         #
-        # STOP / HOLD:
-        # The joystick naturally stops changing the targets when
-        # released. X does not reset the robot.
+        # STOP / HOLD
         # ------------------------------------------------------------
 
         if self.buttons[2] == 1:
@@ -296,12 +324,20 @@ class ScaraJoystick(Node):
             )
 
         # ------------------------------------------------------------
-        # Publish current targets
+        # Publish arm continuously
         # ------------------------------------------------------------
 
         self.publish_arm()
 
-        self.publish_gripper()
+        # ------------------------------------------------------------
+        # Publish gripper only when target changes
+        # ------------------------------------------------------------
+
+        if self.gripper_changed:
+
+            self.publish_gripper()
+
+            self.gripper_changed = False
 
     # ================================================================
     # Publish arm trajectory
@@ -343,7 +379,9 @@ class ScaraJoystick(Node):
 
         point = JointTrajectoryPoint()
 
+        # Both fingers receive the same target.
         point.positions = [
+            float(self.gripper),
             float(self.gripper)
         ]
 
@@ -356,6 +394,10 @@ class ScaraJoystick(Node):
 
         self.gripper_pub.publish(msg)
 
+
+# ====================================================================
+# Main
+# ====================================================================
 
 def main(args=None):
 
@@ -371,9 +413,7 @@ def main(args=None):
 
     finally:
         node.destroy_node()
-
-        if rclpy.ok():
-            rclpy.shutdown()
+        rclpy.shutdown()
 
 
 if __name__ == '__main__':
