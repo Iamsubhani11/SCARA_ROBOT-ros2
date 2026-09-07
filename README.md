@@ -1,254 +1,401 @@
-# SCARA Robot Simulation Workspace (ROS 2 Humble, Gazebo Harmonic & MuJoCo)
+# SCARA Robot Simulation Workspace
 
-A ROS 2 Humble workspace for a **4-DOF SCARA Robot** with:
+**ROS 2 Humble · Gazebo Harmonic · MuJoCo**
 
-- Column/Base rotation
-- Shoulder/Z-axis movement
+A ROS 2 workspace for a **4-DOF SCARA robot** with dual-finger gripper, conveyor belt, puck payload, Xbox joystick control, hand-gesture control, and pick-and-place support.
+
+## Robot Features
+
+- 4-DOF SCARA robot
+- Column / base rotation
+- Shoulder / Z-axis movement
 - Forearm rotation
 - Wrist rotation
-- Two-finger gripper
+- Dual-finger gripper
 - Conveyor belt
 - Yellow puck payload
 - Xbox joystick control
-- AI hand gesture control
+- AI hand-gesture control
 - MuJoCo simulation
 - Gazebo Harmonic simulation
-- Automated pick-and-place support
+- ROS 2 `ros2_control`
+- Pick-and-place support
+- MoveIt-compatible robot description
 
 ---
 
-# 🎮 CONTROL METHODS
+# 🎮 Control Methods
 
-The project supports both **MuJoCo** and **Gazebo Harmonic**.
+The project supports two simulation environments:
+
+| Simulation | Joystick | Hand Gesture | Keyboard |
+|---|---|---|---|
+| **MuJoCo** | ✅ | ✅ | ✅ |
+| **Gazebo Harmonic** | ✅ | ✅ | ✅ |
+
+> **Important:** Do not run the Gazebo joystick controller and Gazebo gesture controller at the same time. Both command the same Gazebo controllers.
 
 ---
 
-# 1. 🎮 Xbox Joystick Control — MuJoCo
+# 1. 🎮 Xbox Joystick — MuJoCo
 
 ## Terminal 1 — Start Xbox joystick driver
 
 ```bash
 source /opt/ros/$ROS_DISTRO/setup.bash
 ros2 run joy joy_node
+```
 
-erminal 2 — Start MuJoCo joystick controller
+Keep this terminal running.
+
+## Terminal 2 — Start MuJoCo joystick controller
+
+```bash
 cd ~/Scara_robot
 source /opt/ros/$ROS_DISTRO/setup.bash
 python3 scripts/scara_mujoco_joystick.py
-Xbox Controls
-Xbox Control	SCARA Function
-Left Stick X	Column / Base Rotation
-Left Stick Y	Shoulder / Z
-Right Stick X	Forearm
-Right Stick Y	Wrist
-A	Close Gripper
-B	Open Gripper
-Y	Home
-X	Hold
-2. 🖐️ Hand Gesture Control — MuJoCo
+```
+
+## Xbox Controls
+
+| Xbox Control | SCARA Function |
+|---|---|
+| Left Stick X | Column / Base Rotation |
+| Left Stick Y | Shoulder / Z |
+| Right Stick X | Forearm |
+| Right Stick Y | Wrist |
+| A | Close Gripper |
+| B | Open Gripper |
+| Y | Home |
+| X | Hold |
+
+---
+
+# 2. 🖐️ Hand Gesture Control — MuJoCo
 
 Run:
 
+```bash
 cd ~/Scara_robot
 python3 gesture_control/gesture_control_mujoco.py
+```
 
-This starts the MediaPipe hand gesture controller for the MuJoCo simulation.
+This starts the MediaPipe hand-gesture controller for the MuJoCo simulation.
 
-3. 🤖 Gazebo Harmonic Simulation
+---
 
-Gazebo uses:
+# 3. 🤖 Gazebo Harmonic
 
-ROS 2 Humble
-Gazebo Harmonic / Gazebo Sim 8
-gz_ros2_control
-JointTrajectoryController
-JointStateBroadcaster
-Terminal 1 — Launch Gazebo
+## Gazebo Components
+
+The Gazebo simulation uses:
+
+- ROS 2 Humble
+- Gazebo Harmonic / Gazebo Sim 8
+- `gz_ros2_control`
+- `JointTrajectoryController`
+- `JointStateBroadcaster`
+
+## Terminal 1 — Launch Gazebo
+
+```bash
 cd ~/Scara_robot
 source /opt/ros/$ROS_DISTRO/setup.bash
 source ~/gz_ros2_control_ws/install/setup.bash
 source ~/Scara_robot/install/setup.bash
+
+export GZ_SIM_SYSTEM_PLUGIN_PATH=$HOME/gz_ros2_control_ws/install/gz_ros2_control/lib:$GZ_SIM_SYSTEM_PLUGIN_PATH
+export LD_LIBRARY_PATH=$HOME/gz_ros2_control_ws/install/gz_ros2_control/lib:$LD_LIBRARY_PATH
+
 ros2 launch scara_description gazebo.launch.py
+```
 
 Keep this terminal running.
 
-4. 🎮 Xbox Joystick Control — Gazebo Harmonic
-Terminal 1 — Gazebo
+---
+
+# 4. 🎮 Xbox Joystick — Gazebo Harmonic
+
+## Terminal 1 — Launch Gazebo
+
+```bash
 cd ~/Scara_robot
 source /opt/ros/$ROS_DISTRO/setup.bash
 source ~/gz_ros2_control_ws/install/setup.bash
 source ~/Scara_robot/install/setup.bash
+
+export GZ_SIM_SYSTEM_PLUGIN_PATH=$HOME/gz_ros2_control_ws/install/gz_ros2_control/lib:$GZ_SIM_SYSTEM_PLUGIN_PATH
+export LD_LIBRARY_PATH=$HOME/gz_ros2_control_ws/install/gz_ros2_control/lib:$LD_LIBRARY_PATH
+
 ros2 launch scara_description gazebo.launch.py
-Terminal 2 — Xbox joystick driver
+```
+
+## Terminal 2 — Start Xbox joystick driver
+
+```bash
 source /opt/ros/$ROS_DISTRO/setup.bash
 ros2 run joy joy_node
+```
 
 Keep this terminal running.
 
-Terminal 3 — Gazebo joystick controller
+## Terminal 3 — Start Gazebo joystick controller
+
+```bash
 cd ~/Scara_robot
 source /opt/ros/$ROS_DISTRO/setup.bash
 source ~/gz_ros2_control_ws/install/setup.bash
 source ~/Scara_robot/install/setup.bash
 python3 scripts/scara_joystick.py
-Xbox Controls
-Xbox Control	SCARA Function
-Left Stick X	Column / Base Rotation
-Left Stick Y	Shoulder / Z
-Right Stick X	Forearm
-Right Stick Y	Wrist
-A	Close BOTH gripper fingers
-B	Open BOTH gripper fingers
-Y	Home
-X	Hold
-Important
+```
 
-The Gazebo joystick controller directly commands both:
+## Xbox Controls
 
+| Xbox Control | SCARA Function |
+|---|---|
+| Left Stick X | Column / Base Rotation |
+| Left Stick Y | Shoulder / Z |
+| Right Stick X | Forearm |
+| Right Stick Y | Wrist |
+| A | Close **both** gripper fingers |
+| B | Open **both** gripper fingers |
+| Y | Home |
+| X | Hold |
+
+### Gazebo Gripper
+
+The Gazebo joystick controller directly commands:
+
+```text
 left_finger_joint
 right_finger_joint
+```
 
-The Gazebo version does not depend on the unsupported physics-engine mimic constraint.
+The Gazebo version does **not** depend on the unsupported physics-engine mimic constraint.
 
-5. 🖐️ Hand Gesture Control — Gazebo Harmonic
-Terminal 1 — Launch Gazebo
+---
+
+# 5. 🖐️ Hand Gesture Control — Gazebo Harmonic
+
+## Terminal 1 — Launch Gazebo
+
+```bash
 cd ~/Scara_robot
 source /opt/ros/$ROS_DISTRO/setup.bash
 source ~/gz_ros2_control_ws/install/setup.bash
 source ~/Scara_robot/install/setup.bash
+
+export GZ_SIM_SYSTEM_PLUGIN_PATH=$HOME/gz_ros2_control_ws/install/gz_ros2_control/lib:$GZ_SIM_SYSTEM_PLUGIN_PATH
+export LD_LIBRARY_PATH=$HOME/gz_ros2_control_ws/install/gz_ros2_control/lib:$LD_LIBRARY_PATH
+
 ros2 launch scara_description gazebo.launch.py
-Terminal 2 — Start Gazebo gesture controller
+```
+
+## Terminal 2 — Start Gazebo gesture controller
+
+```bash
 cd ~/Scara_robot
 source /opt/ros/$ROS_DISTRO/setup.bash
 source ~/Scara_robot/install/setup.bash
 python3 gesture_control/gesture_control_ros2.py
-Important
+```
 
-Do not run the Gazebo joystick controller and Gazebo gesture controller at the same time because both send commands to the same Gazebo controllers.
+---
 
-6. ⌨️ Keyboard Teleoperation — Gazebo
+# 6. ⌨️ Keyboard Teleoperation
+
+## Gazebo
+
+```bash
 cd ~/Scara_robot
 source /opt/ros/$ROS_DISTRO/setup.bash
 source ~/Scara_robot/install/setup.bash
 python3 scripts/scara_teleop.py
-7. ⌨️ Keyboard Teleoperation — MuJoCo
+```
+
+## MuJoCo
+
+```bash
 cd ~/Scara_robot
 source /opt/ros/$ROS_DISTRO/setup.bash
 python3 scripts/scara_mujoco_teleop.py
-🦾 CONTROLLER CHECK — GAZEBO
+```
 
-After launching Gazebo, verify that all controllers are active:
+---
 
+# 🦾 Controller Check — Gazebo
+
+After launching Gazebo:
+
+```bash
 source /opt/ros/$ROS_DISTRO/setup.bash
 source ~/gz_ros2_control_ws/install/setup.bash
 source ~/Scara_robot/install/setup.bash
+```
 
+Check controllers:
+
+```bash
 ros2 control list_controllers
+```
 
 Expected:
 
-gripper_controller      ... active
-joint_state_broadcaster ... active
-arm_controller          ... active
+```text
+gripper_controller       ... active
+joint_state_broadcaster  ... active
+arm_controller           ... active
+```
 
 Check hardware interfaces:
 
+```bash
 ros2 control list_hardware_interfaces
+```
 
 Expected gripper command interfaces:
 
+```text
 left_finger_joint/position  [available] [claimed]
 right_finger_joint/position [available] [claimed]
-🧪 MANUAL GAZEBO JOINT TESTS
-Column
-ros2 topic pub --once /arm_controller/joint_trajectory trajectory_msgs/msg/JointTrajectory "
-joint_names: ['column_joint']
+```
+
+---
+
+# 🧪 Manual Gazebo Joint Tests
+
+## Column
+
+```bash
+ros2 topic pub --once /arm_controller/joint_trajectory \
+trajectory_msgs/msg/JointTrajectory \
+"joint_names: ['column_joint']
 points:
 - positions: [1.0]
-  time_from_start: {sec: 2}
-"
+  time_from_start: {sec: 2}"
+```
 
-Return home:
+### Return Home
 
-ros2 topic pub --once /arm_controller/joint_trajectory trajectory_msgs/msg/JointTrajectory "
-joint_names: ['column_joint']
+```bash
+ros2 topic pub --once /arm_controller/joint_trajectory \
+trajectory_msgs/msg/JointTrajectory \
+"joint_names: ['column_joint']
 points:
 - positions: [0.0]
-  time_from_start: {sec: 2}
-"
-Shoulder / Z
-ros2 topic pub --once /arm_controller/joint_trajectory trajectory_msgs/msg/JointTrajectory "
-joint_names: ['shoulder_joint']
+  time_from_start: {sec: 2}"
+```
+
+## Shoulder / Z
+
+```bash
+ros2 topic pub --once /arm_controller/joint_trajectory \
+trajectory_msgs/msg/JointTrajectory \
+"joint_names: ['shoulder_joint']
 points:
 - positions: [-0.10]
-  time_from_start: {sec: 2}
-"
-Forearm
-ros2 topic pub --once /arm_controller/joint_trajectory trajectory_msgs/msg/JointTrajectory "
-joint_names: ['forearm_joint']
+  time_from_start: {sec: 2}"
+```
+
+## Forearm
+
+```bash
+ros2 topic pub --once /arm_controller/joint_trajectory \
+trajectory_msgs/msg/JointTrajectory \
+"joint_names: ['forearm_joint']
 points:
 - positions: [1.0]
-  time_from_start: {sec: 2}
-"
-Wrist
-ros2 topic pub --once /arm_controller/joint_trajectory trajectory_msgs/msg/JointTrajectory "
-joint_names: ['wrist_joint']
+  time_from_start: {sec: 2}"
+```
+
+## Wrist
+
+```bash
+ros2 topic pub --once /arm_controller/joint_trajectory \
+trajectory_msgs/msg/JointTrajectory \
+"joint_names: ['wrist_joint']
 points:
 - positions: [1.0]
-  time_from_start: {sec: 2}
-"
-Close Gripper
-ros2 topic pub --once /gripper_controller/joint_trajectory trajectory_msgs/msg/JointTrajectory "
-joint_names: ['left_finger_joint','right_finger_joint']
+  time_from_start: {sec: 2}"
+```
+
+## Close Gripper
+
+```bash
+ros2 topic pub --once /gripper_controller/joint_trajectory \
+trajectory_msgs/msg/JointTrajectory \
+"joint_names: ['left_finger_joint','right_finger_joint']
 points:
 - positions: [-0.05,-0.05]
-  time_from_start: {sec: 2}
-"
-Open Gripper
-ros2 topic pub --once /gripper_controller/joint_trajectory trajectory_msgs/msg/JointTrajectory "
-joint_names: ['left_finger_joint','right_finger_joint']
+  time_from_start: {sec: 2}"
+```
+
+## Open Gripper
+
+```bash
+ros2 topic pub --once /gripper_controller/joint_trajectory \
+trajectory_msgs/msg/JointTrajectory \
+"joint_names: ['left_finger_joint','right_finger_joint']
 points:
 - positions: [0.0,0.0]
-  time_from_start: {sec: 2}
-"
-🖐️ AI HAND GESTURE CONTROL
+  time_from_start: {sec: 2}"
+```
 
-Gesture control files:
+---
 
+# 🖐️ AI Hand Gesture Control
+
+Gesture-control files:
+
+```text
 gesture_control/
 ├── gesture_control_mujoco.py
 ├── gesture_control_ros2.py
 └── README.md
+```
 
-MuJoCo:
+## MuJoCo
 
+```bash
 cd ~/Scara_robot
 python3 gesture_control/gesture_control_mujoco.py
+```
 
-Gazebo:
+## Gazebo
 
+```bash
 cd ~/Scara_robot
 source /opt/ros/$ROS_DISTRO/setup.bash
 source ~/Scara_robot/install/setup.bash
 python3 gesture_control/gesture_control_ros2.py
-🌟 FEATURES
-4-DOF SCARA robot
-Revolute column joint
-Prismatic shoulder/Z joint
-Revolute forearm joint
-Revolute wrist joint
-Dual-finger gripper
-Conveyor belt
-Yellow puck payload
-Gazebo Harmonic simulation
-MuJoCo simulation
-ROS 2 ros2_control
-Xbox joystick control
-AI hand gesture control
-Keyboard teleoperation
-Pick-and-place support
-MoveIt-compatible robot description
-📂 REPOSITORY STRUCTURE
+```
+
+---
+
+# 🌟 Features
+
+- **4-DOF SCARA robot**
+- Revolute column joint
+- Prismatic shoulder / Z joint
+- Revolute forearm joint
+- Revolute wrist joint
+- Dual-finger gripper
+- Conveyor belt
+- Yellow puck payload
+- Gazebo Harmonic simulation
+- MuJoCo simulation
+- ROS 2 `ros2_control`
+- Xbox joystick control
+- AI hand-gesture control
+- Keyboard teleoperation
+- Pick-and-place support
+- MoveIt-compatible robot description
+
+---
+
+# 📂 Repository Structure
+
+```text
 Scara_robot/
 ├── config/
 │   └── scara_controllers.yaml
@@ -289,8 +436,15 @@ Scara_robot/
 │
 ├── CMakeLists.txt
 └── package.xml
-🛠️ DEPENDENCIES
-ROS 2 Humble
+```
+
+---
+
+# 🛠️ Dependencies
+
+## ROS 2 Humble
+
+```bash
 sudo apt update
 sudo apt install -y \
   ros-humble-ros-gz \
@@ -301,108 +455,163 @@ sudo apt install -y \
   ros-humble-xacro \
   ros-humble-robot-state-publisher \
   ros-humble-joy
-Gazebo Harmonic gz_ros2_control
+```
 
-The project uses a Harmonic-compatible build of gz_ros2_control.
+## Gazebo Harmonic — `gz_ros2_control`
+
+The project uses a **Harmonic-compatible build** of `gz_ros2_control`.
 
 Workspace:
 
+```text
 ~/gz_ros2_control_ws
+```
 
-Source it before launching Gazebo:
+Before launching Gazebo:
 
+```bash
 source /opt/ros/$ROS_DISTRO/setup.bash
 source ~/gz_ros2_control_ws/install/setup.bash
 source ~/Scara_robot/install/setup.bash
-🐍 PYTHON DEPENDENCIES
-python3 -m pip install "numpy<2" "mediapipe==0.10.14" "opencv-python==4.9.0.80" mujoco
-🚀 INSTALLATION
+```
 
-Clone the repository:
+## Python
 
+```bash
+python3 -m pip install \
+  "numpy<2" \
+  "mediapipe==0.10.14" \
+  "opencv-python==4.9.0.80" \
+  mujoco
+```
+
+---
+
+# 🚀 Installation
+
+## Clone the repository
+
+```bash
 git clone https://github.com/Iamsubhani11/scara-original-files.git ~/Scara_robot
+```
 
-Build:
+## Build
 
+```bash
 cd ~/Scara_robot
 source /opt/ros/humble/setup.bash
 colcon build --symlink-install
+```
 
-Source:
+## Source the workspace
 
+```bash
 source ~/Scara_robot/install/setup.bash
-🎯 QUICK START
-MuJoCo + Xbox Joystick
+```
 
-Terminal 1:
+---
 
+# 🎯 Quick Start
+
+## MuJoCo + Xbox Joystick
+
+### Terminal 1
+
+```bash
 source /opt/ros/$ROS_DISTRO/setup.bash
 ros2 run joy joy_node
+```
 
-Terminal 2:
+### Terminal 2
 
+```bash
 cd ~/Scara_robot
 source /opt/ros/$ROS_DISTRO/setup.bash
 python3 scripts/scara_mujoco_joystick.py
-MuJoCo + Hand Gesture
+```
+
+## MuJoCo + Hand Gesture
+
+```bash
 cd ~/Scara_robot
 python3 gesture_control/gesture_control_mujoco.py
-Gazebo + Xbox Joystick
+```
 
-Terminal 1:
+## Gazebo + Xbox Joystick
 
+### Terminal 1
+
+```bash
 cd ~/Scara_robot
 source /opt/ros/$ROS_DISTRO/setup.bash
 source ~/gz_ros2_control_ws/install/setup.bash
 source ~/Scara_robot/install/setup.bash
+
+export GZ_SIM_SYSTEM_PLUGIN_PATH=$HOME/gz_ros2_control_ws/install/gz_ros2_control/lib:$GZ_SIM_SYSTEM_PLUGIN_PATH
+export LD_LIBRARY_PATH=$HOME/gz_ros2_control_ws/install/gz_ros2_control/lib:$LD_LIBRARY_PATH
+
 ros2 launch scara_description gazebo.launch.py
+```
 
-Terminal 2:
+### Terminal 2
 
+```bash
 source /opt/ros/$ROS_DISTRO/setup.bash
 ros2 run joy joy_node
+```
 
-Terminal 3:
+### Terminal 3
 
+```bash
 cd ~/Scara_robot
 source /opt/ros/$ROS_DISTRO/setup.bash
 source ~/gz_ros2_control_ws/install/setup.bash
 source ~/Scara_robot/install/setup.bash
 python3 scripts/scara_joystick.py
-Gazebo + Hand Gesture
+```
 
-Terminal 1:
+## Gazebo + Hand Gesture
 
-cd ~/Scara_robot
-source /opt/ros/$ROS_DISTRO/setup.bash
-source ~/gz_ros2_control_ws/install/setup.bash
-source ~/Scara_robot/install/setup.bash
-ros2 launch scara_description gazebo.launch.py
+### Terminal 1
 
-Terminal 2:
+Use the same Gazebo launch command shown above.
 
+### Terminal 2
+
+```bash
 cd ~/Scara_robot
 source /opt/ros/$ROS_DISTRO/setup.bash
 source ~/Scara_robot/install/setup.bash
 python3 gesture_control/gesture_control_ros2.py
-📌 IMPORTANT PROJECT NOTES
-Keep the MuJoCo and Gazebo control files separate.
-Do not delete the MuJoCo joystick or gesture-control files.
-Gazebo joystick control uses ROS 2 JointTrajectory commands.
-Gazebo gripper control directly commands both finger joints.
-Do not run Gazebo joystick control and Gazebo gesture control simultaneously.
-Always source the appropriate workspaces before launching Gazebo.
-The SCARA mesh alignment should not be changed without checking the existing reference geometry.
-🤖 AUTOMATED PICK AND PLACE
+```
+
+---
+
+# 📌 Important Project Notes
+
+1. Keep the MuJoCo and Gazebo control files separate.
+2. Do not delete the MuJoCo joystick or gesture-control files.
+3. Gazebo joystick control uses ROS 2 `JointTrajectory` commands.
+4. Gazebo gripper control directly commands both finger joints.
+5. Do not run Gazebo joystick and Gazebo gesture control simultaneously.
+6. Always source the appropriate workspaces before launching Gazebo.
+7. Do not change the SCARA mesh alignment without checking the existing reference geometry.
+
+---
+
+# 🤖 Automated Pick and Place
 
 Run:
 
+```bash
 cd ~/Scara_robot
 source /opt/ros/$ROS_DISTRO/setup.bash
 source ~/Scara_robot/install/setup.bash
 ros2 run scara_description pick_and_place.py
-📜 LICENSE
+```
 
-This repository is licensed under the Apache 2.0 License.
+---
 
+# 📜 License
 
+This repository is licensed under the **Apache 2.0 License**.
