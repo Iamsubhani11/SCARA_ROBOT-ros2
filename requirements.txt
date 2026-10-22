@@ -1,0 +1,14 @@
+# Python packages for the SCARA project (ROS 2 Humble / Ubuntu 22.04, Python 3.10)
+#   python3 -m pip install -r requirements.txt
+numpy<2
+opencv-python==4.9.0.80
+mediapipe==0.10.14          # hand-gesture control
+mujoco>=3.2.7               # MuJoCo simulation (needs the native collision engine)
+pyserial>=3.5                # digital twin: USB link to the Arduino
+
+# Voice control (optional)
+SpeechRecognition>=3.10     # microphone + speech-to-text front end
+pyaudio                     # microphone access   (sudo apt install portaudio19-dev first)
+pyttsx3                     # robot talks back    (sudo apt install espeak-ng)
+# openai-whisper            # offline Whisper speech-to-text (large download, uncomment to use)
+# openai                    # ChatGPT sentence understanding / Whisper API (needs OPENAI_API_KEY)

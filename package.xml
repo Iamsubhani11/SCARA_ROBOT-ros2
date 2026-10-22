@@ -2,10 +2,11 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>scara_description</name>
-  <version>0.0.1</version>
-  <description>SCARA Robot Description and Simulation Package</description>
-  <maintainer email="user@todo.todo">hemanthros</maintainer>
-  <license>Apache-2.0</license>
+  <version>3.0.0</version>
+  <description>SCARA robot digital twin: ROS 2 description, colour-sorting conveyor cell in Gazebo Harmonic and MuJoCo, real-robot firmware and camera cell, browser GUI and Android app (FK/IK, voice, hand control)</description>
+  <maintainer email="Iamsubhani11@users.noreply.github.com">Shaik Subhani</maintainer>
+  <author>Shaik Subhani</author>
+  <license>MIT</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
@@ -19,6 +20,25 @@
   <exec_depend>ros2_control</exec_depend>
   <exec_depend>ros2_controllers</exec_depend>
   <exec_depend>joint_trajectory_controller</exec_depend>
+  <exec_depend>joint_state_broadcaster</exec_depend>
+  <exec_depend>controller_manager</exec_depend>
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>visualization_msgs</exec_depend>
+  <exec_depend>rosgraph_msgs</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>trajectory_msgs</exec_depend>
+  <exec_depend>control_msgs</exec_depend>
+  <exec_depend>builtin_interfaces</exec_depend>
+  <exec_depend>python3-numpy</exec_depend>
+  <exec_depend>python3-opencv</exec_depend>
+  <exec_depend>tf2_msgs</exec_depend>
+  <exec_depend>tf2_ros</exec_depend>
+  <exec_depend>rviz2</exec_depend>
+  <!-- digital twin -->
+  <exec_depend>python3-serial</exec_depend>
+  <exec_depend>rosbridge_server</exec_depend>
 
   <export>
     <build_type>ament_cmake</build_type>

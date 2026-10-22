@@ -1,55 +1,37 @@
-# 🖐️ SCARA Robot AI Hand Gesture Control
+# SCARA Two-Hand Gesture Control
 
-This folder contains the **AI Webcam Hand Gesture Teleoperation** nodes for controlling the SCARA robot in both **MuJoCo 3.12** and **Gazebo Ignition** simulations using OpenCV and MediaPipe.
+Webcam + MediaPipe, works in **Gazebo** (ROS 2) and **MuJoCo** with the same gestures.
 
----
-
-## 🖐️ Gesture Control Mapping & How to Operate
-
-### Step 1: Select Active Joint by Extended Finger Count
-- ☝️ **1 Finger**: Select Joint 1 - **Base Column (`column_joint`)**
-- ✌️ **2 Fingers**: Select Joint 2 - **Z-Axis Elevation (`shoulder_joint`)**
-- 🤟 **3 Fingers**: Select Joint 3 - **Forearm Elbow (`forearm_joint`)**
-- 🖖 **4 Fingers**: Select Joint 4 - **Wrist Rotation (`wrist_joint`)**
-- 🖐️ **5 Fingers**: Select Joint 5 - **Gripper (`left_finger_joint`)**
-
-### Step 2: Choose Motion Direction by Tilting Hand
-- ↩️ **Tilt Hand LEFT**: Move Selected Joint **LEFT / DOWN / OPEN**
-- ⏹️ **Keep Hand LEVEL**: **HOLD / STOP** Selected Joint Position
-- ↪️ **Tilt Hand RIGHT**: Move Selected Joint **RIGHT / UP / CLOSE**
-
----
-
-## 🛠️ Prerequisites & Installation
-
-Install MediaPipe, OpenCV, NumPy 1.x, and MuJoCo:
+| Hand | Movement | Robot |
+|---|---|---|
+| **Left** (blue) | left / right | base column rotation – the robot faces you, so the arm swings the same way as your hand |
+| | up / down | Z height |
+| **Right** (orange) | left / right | forearm |
+| | tilt (roll) | wrist |
+| | pinch thumb + index | close gripper (release = open) |
+| either | fist | freeze that hand's joints |
+| either | out of view | hold |
 
 ```bash
-python3 -m pip install "numpy<2" "mediapipe==0.10.14" "opencv-python==4.9.0.80" mujoco
+# Gazebo: start the manual table world (no conveyor, no sorter)
+ros2 launch scara_description gazebo.launch.py mode:=manual
+python3 gesture_control/gesture_control_ros2.py          # camera:=1 for another webcam: --ros-args -p camera:=1
+
+# MuJoCo
+python3 gesture_control/gesture_control_mujoco.py         # q = quit (manual table world, no conveyor)
 ```
 
----
+Files
 
-## 🚀 Gesture Control Launch Commands
+* `gesture_core.py` – the gesture → joint logic (shared, no ROS/MuJoCo inside)
+* `gesture_control_ros2.py` – streams `/arm_controller/joint_trajectory` and commands **both** fingers
+* `gesture_control_mujoco.py` – drives the MuJoCo actuators
+* `../tools/test_gesture_core.py` – unit tests with synthetic hands
 
-### 🎮 1. Launch Gesture Control in MuJoCo
-Run this command to control the SCARA robot in **MuJoCo 3.12**:
+Why it changed: the old version picked a joint by counting fingers and moved it by tilting the
+hand – but tilting changes MediaPipe's finger count, so the selected joint kept jumping. The
+gripper direction was also reversed and only one finger moved in Gazebo.
 
-```bash
-cd ~/scara_description_ws
-source /opt/ros/humble/setup.bash
-source install/setup.bash
-ros2 run scara_description gesture_control_mujoco.py
-```
-
----
-
-### 🤖 2. Launch Gesture Control in Gazebo (ROS 2)
-Run this command to control the SCARA robot in **Gazebo Ignition**:
-
-```bash
-cd ~/scara_description_ws
-source /opt/ros/humble/setup.bash
-source install/setup.bash
-ros2 run scara_description gesture_control_ros2.py
-```
+Tuning (top of `gesture_core.py`): `LEFT_X`, `RIGHT_X`, `HAND_Y` (where in the picture each hand
+works), `MAX_SPEED`, `PINCH_CLOSE` / `PINCH_OPEN`, `SMOOTH`.  If a direction feels reversed,
+swap the two numbers of that joint's `*_RANGE`.

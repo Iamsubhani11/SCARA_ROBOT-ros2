@@ -1,152 +1,153 @@
+"""
+SCARA cell in Gazebo Harmonic - three modes, like the Mechamind Labs videos.
+
+    ros2 launch scara_description gazebo.launch.py                   # SORTING: endless conveyor, 4 bins,
+                                                                     #   every colour into its own bin
+    ros2 launch scara_description gazebo.launch.py mode:=command     # COMMAND: endless conveyor, ONE bin;
+                                                                     #   the robot picks the colour you ask for
+        python3 scripts/scara_ask.py            # 2nd terminal: type a colour   (red / any / stop / start)
+        python3 scripts/scara_ask.py --voice    # or say "Hey SCARA ... the red one"
+    ros2 launch scara_description gazebo.launch.py mode:=manual      # MANUAL: table + 3 blue / 3 green pucks,
+                                                                     #   no conveyor - keyboard / joystick / gestures
+
+Arguments
+  mode       sort | command | manual                               (default sort)
+             (old names still work: sorter:=false -> manual, wait:=true -> command)
+  pucks      number of pucks to spawn, 0 = endless                 (default 0)
+  empty_bins true|false take placed pucks out of the bin(s)          (default true)
+             false: after `capacity` pucks a bin is "full" until you send "empty"
+  capacity   pucks per bin with empty_bins:=false                  (default 4)
+  show       true|false   OpenCV camera windows                     (default true)
+  rviz       true|false   RViz with the robot and the cell          (default false)
+  headless   true|false   no Gazebo window, server only (cameras still render) (default false)
+"""
 import os
+
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import IncludeLaunchDescription, AppendEnvironmentVariable, RegisterEventHandler
+from launch.actions import (AppendEnvironmentVariable, DeclareLaunchArgument, IncludeLaunchDescription,
+                            RegisterEventHandler, TimerAction)
+from launch.conditions import IfCondition
 from launch.event_handlers import OnProcessExit
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import Command
+from launch.substitutions import Command, LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
 from launch_ros.parameter_descriptions import ParameterValue
 
+
+def plugin_dirs():
+    """Where gz_ros2_control's system plugin may live: the ROS install and the usual
+    source workspace (~/gz_ros2_control_ws), so GZ_SIM_SYSTEM_PLUGIN_PATH need not be set by hand."""
+    distro = os.environ.get('ROS_DISTRO', 'humble')
+    cands = [f'/opt/ros/{distro}/lib',
+             os.path.expanduser('~/gz_ros2_control_ws/install/gz_ros2_control/lib'),
+             os.path.expanduser('~/ros2_ws/install/gz_ros2_control/lib')]
+    return os.pathsep.join(c for c in cands if os.path.isdir(c)) or f'/opt/ros/{distro}/lib'
+
+
+def name_plate(pkg):
+    """'true' when meshes/shoulder_name.stl exists (the named version of the robot)."""
+    return 'true' if os.path.exists(os.path.join(pkg, 'meshes', 'shoulder_name.stl')) else 'false'
+
+
 def generate_launch_description():
-    pkg_scara_description = get_package_share_directory('scara_description')
+    pkg = get_package_share_directory('scara_description')
     pkg_ros_gz_sim = get_package_share_directory('ros_gz_sim')
+    worlds = os.path.join(pkg, 'worlds')
+    xacro_file = os.path.join(pkg, 'urdf', 'scara.urdf.xacro')
+    install_share = os.path.dirname(pkg)   # so package://scara_description/... resolves
 
-    # Paths to Xacro / SDF files
-    scara_xacro_file = os.path.join(pkg_scara_description, 'urdf', 'scara.urdf.xacro')
-    conveyor_xacro_file = os.path.join(pkg_scara_description, 'urdf', 'new_conveyor.xacro')
-    yellow_puck_sdf_file = os.path.join(pkg_scara_description, 'urdf', 'yellow_puck.sdf')
+    pucks = LaunchConfiguration('pucks')
+    show = LaunchConfiguration('show')
+    # effective mode (the old arguments sorter:=false / wait:=true still work)
+    mode = PythonExpression(["'manual' if '", LaunchConfiguration('sorter'), "' == 'false' else "
+                             "('command' if '", LaunchConfiguration('wait'), "' == 'true' else '",
+                             LaunchConfiguration('mode'), "')"])
+    world = PythonExpression(["{'sort': 'scara_world', 'command': 'scara_command_world', "
+                              "'manual': 'scara_manual_world'}.get('", mode, "', 'scara_world')"])
+    cell = PythonExpression(["'", mode, "' != 'manual'"])
+    empty_bins = LaunchConfiguration('empty_bins')
+    capacity = LaunchConfiguration('capacity')
 
-    # Process Xacro contents
-    scara_description_config = Command(['xacro ', scara_xacro_file])
-    scara_robot_description = {'robot_description': ParameterValue(scara_description_config, value_type=str)}
+    robot_description = {'robot_description': ParameterValue(Command(['xacro ', xacro_file, ' name_plate:=', name_plate(pkg)]), value_type=str),
+                         'use_sim_time': True}
 
-    conveyor_description_config = Command(['xacro ', conveyor_xacro_file])
+    gazebo = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(os.path.join(pkg_ros_gz_sim, 'launch', 'gz_sim.launch.py')),
+        launch_arguments={'gz_args': [PythonExpression(["'-r -s --headless-rendering ' if '", LaunchConfiguration('headless'),
+                                                         "' == 'true' else '-r '"]), worlds, '/', world, '.sdf']}.items())
 
-    # Parent directory of package share so package://scara_description/meshes/... resolves
-    install_dir = os.path.dirname(pkg_scara_description)
+    rsp = Node(package='robot_state_publisher', executable='robot_state_publisher',
+               output='screen', parameters=[robot_description])
 
-    # Set Ignition / Gazebo environment variables
-    set_ign_resource_path = AppendEnvironmentVariable(
-        name='IGN_GAZEBO_RESOURCE_PATH',
-        value=install_dir
-    )
-    set_gz_resource_path = AppendEnvironmentVariable(
-        name='GZ_SIM_RESOURCE_PATH',
-        value=install_dir
-    )
-    set_ign_plugin_path = AppendEnvironmentVariable(
-        name='IGN_GAZEBO_SYSTEM_PLUGIN_PATH',
-        value='/opt/ros/humble/lib'
-    )
-    set_gz_plugin_path = AppendEnvironmentVariable(
-        name='GZ_SIM_SYSTEM_PLUGIN_PATH',
-        value='/opt/ros/humble/lib'
-    )
+    spawn_robot = Node(package='ros_gz_sim', executable='create', output='screen',
+                       arguments=['-world', 'scara_world', '-topic', 'robot_description', '-name', 'scara',
+                                  '-x', '0', '-y', '0', '-z', '0'])
 
-    # Include Gazebo Sim launch file
-    gazebo_sim = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            os.path.join(pkg_ros_gz_sim, 'launch', 'gz_sim.launch.py')
-        ),
-        launch_arguments={'gz_args': '-r empty.sdf'}.items()
-    )
-
-    # Robot State Publisher node
-    robot_state_publisher_node = Node(
-        package='robot_state_publisher',
-        executable='robot_state_publisher',
-        output='screen',
-        parameters=[scara_robot_description]
-    )
-
-    # Spawn SCARA Robot on Top of Wooden Table Base Platform
-    spawn_scara_node = Node(
-        package='ros_gz_sim',
-        executable='create',
+    bridge = Node(
+        package='ros_gz_bridge', executable='parameter_bridge', output='screen',
+        parameters=[{'use_sim_time': True}],
         arguments=[
-            '-topic', 'robot_description',
-            '-name', 'scara',
-            '-x', '0.0',
-            '-y', '0.0',
-            '-z', '0.0'
+            '/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock',
+            '/fixed_camera/image@sensor_msgs/msg/Image[gz.msgs.Image',
+            '/fixed_camera/depth_image@sensor_msgs/msg/Image[gz.msgs.Image',
+            '/fixed_camera/camera_info@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo',
+            '/arm_camera/image@sensor_msgs/msg/Image[gz.msgs.Image',
+            '/arm_camera/camera_info@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo',
+            '/model/conveyor_belt/link/belt_link/track_cmd_vel@std_msgs/msg/Float64]gz.msgs.Double',
         ],
-        output='screen'
-    )
+        remappings=[('/model/conveyor_belt/link/belt_link/track_cmd_vel', '/conveyor/speed')])
 
-    # Spawn New Conveyor Belt Track on Wooden Table Surface
-    spawn_conveyor_node = Node(
-        package='ros_gz_sim',
-        executable='create',
-        arguments=[
-            '-string', conveyor_description_config,
-            '-name', 'new_conveyor',
-            '-x', '0.35',
-            '-y', '-0.18',
-            '-z', '0.0'
-        ],
-        output='screen'
-    )
+    # puck / robot poses WITH names (the bridge drops the names of Pose_V entries)
+    poses = Node(package='scara_description', executable='scara_pose_relay.py', output='screen',
+                 parameters=[{'use_sim_time': True, 'world': 'scara_world'}])
 
-    # Spawn Yellow Puck Payload Object on Conveyor Track
-    spawn_yellow_puck_node = Node(
-        package='ros_gz_sim',
-        executable='create',
-        arguments=[
-            '-file', yellow_puck_sdf_file,
-            '-name', 'yellow_puck',
-            '-x', '0.45',
-            '-y', '-0.18',
-            '-z', '0.035'
-        ],
-        output='screen'
-    )
+    def spawner(name):
+        return Node(package='controller_manager', executable='spawner', output='screen',
+                    arguments=[name, '--controller-manager', '/controller_manager'])
 
-    # ROS-GZ Bridge for /clock
-    clock_bridge_node = Node(
-        package='ros_gz_bridge',
-        executable='parameter_bridge',
-        arguments=['/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock'],
-        output='screen'
-    )
+    controllers = RegisterEventHandler(OnProcessExit(
+        target_action=spawn_robot,
+        on_exit=[spawner('joint_state_broadcaster'), spawner('arm_controller'), spawner('gripper_controller')]))
 
-    # Controller Spawners (Sequential)
-    joint_state_broadcaster_spawner = Node(
-        package='controller_manager',
-        executable='spawner',
-        arguments=['joint_state_broadcaster'],
-        output='screen'
-    )
+    vision = Node(package='scara_description', executable='scara_vision_node.py', output='screen',
+                  condition=IfCondition(cell), parameters=[{'use_sim_time': True, 'show': show}])
+    color_sorter = Node(package='scara_description', executable='scara_color_sorter.py', output='screen',
+                        condition=IfCondition(cell),
+                        parameters=[{'use_sim_time': True, 'mode': mode,
+                                     'bin_capacity': PythonExpression(["0 if '", empty_bins, "' == 'true' else int('", capacity, "')"])}])
+    puck_spawner = Node(package='scara_description', executable='scara_puck_spawner.py', output='screen',
+                        condition=IfCondition(cell),
+                        parameters=[{'use_sim_time': True, 'count': pucks, 'world': 'scara_world', 'mode': mode,
+                                     'clear_bins': PythonExpression(["'", empty_bins, "' == 'true'"])}])
 
-    arm_controller_spawner = Node(
-        package='controller_manager',
-        executable='spawner',
-        arguments=['arm_controller'],
-        output='screen'
-    )
-
-    gripper_controller_spawner = Node(
-        package='controller_manager',
-        executable='spawner',
-        arguments=['gripper_controller'],
-        output='screen'
-    )
+    rviz = LaunchConfiguration('rviz')
+    scene = Node(package='scara_description', executable='scara_rviz_scene.py', condition=IfCondition(rviz),
+                 parameters=[{'use_sim_time': True, 'cell': mode}])
+    rviz_node = Node(package='rviz2', executable='rviz2', condition=IfCondition(rviz),
+                     arguments=['-d', os.path.join(pkg, 'config', 'scara.rviz')], parameters=[{'use_sim_time': True}])
 
     return LaunchDescription([
-        set_ign_resource_path,
-        set_gz_resource_path,
-        set_ign_plugin_path,
-        set_gz_plugin_path,
-        gazebo_sim,
-        robot_state_publisher_node,
-        spawn_scara_node,
-        spawn_conveyor_node,
-        spawn_yellow_puck_node,
-        clock_bridge_node,
-        RegisterEventHandler(
-            event_handler=OnProcessExit(
-                target_action=spawn_scara_node,
-                on_exit=[joint_state_broadcaster_spawner, arm_controller_spawner, gripper_controller_spawner],
-            )
-        ),
+        DeclareLaunchArgument('mode', default_value='sort', description='sort | command | manual'),
+        DeclareLaunchArgument('sorter', default_value='true', description='(old) false = manual mode'),
+        DeclareLaunchArgument('wait', default_value='false', description='(old) true = command mode'),
+        DeclareLaunchArgument('pucks', default_value='0'),
+        DeclareLaunchArgument('empty_bins', default_value='true'),
+        DeclareLaunchArgument('capacity', default_value='4'),
+        DeclareLaunchArgument('show', default_value='true'),
+        DeclareLaunchArgument('rviz', default_value='false'),
+        DeclareLaunchArgument('headless', default_value='false', description='true = no Gazebo window'),
+        AppendEnvironmentVariable('GZ_SIM_RESOURCE_PATH', install_share),
+        AppendEnvironmentVariable('IGN_GAZEBO_RESOURCE_PATH', install_share),
+        AppendEnvironmentVariable('GZ_SIM_SYSTEM_PLUGIN_PATH', plugin_dirs()),
+        AppendEnvironmentVariable('IGN_GAZEBO_SYSTEM_PLUGIN_PATH', plugin_dirs()),
+        gazebo,
+        rsp,
+        spawn_robot,
+        bridge,
+        poses,
+        controllers,
+        scene, rviz_node,
+        # give the controllers a few seconds before the robot starts working
+        TimerAction(period=6.0, actions=[vision, color_sorter, puck_spawner]),
     ])

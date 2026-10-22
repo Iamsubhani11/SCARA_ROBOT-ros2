@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 720" font-family="DejaVu Sans, Arial, sans-serif" font-size="13">
+  <!-- SCARA wiring: Arduino UNO + CNC Shield V3 (HowToMechatronics SCARA pins) -->
+  <rect width="1240" height="720" fill="#ffffff"/>
+  <text x="24" y="34" font-size="20" font-weight="bold" fill="#1d2730">SCARA wiring - Arduino UNO + CNC Shield V3</text>
+  <text x="24" y="56" fill="#55616c">Pins, steps and homing as in the HowToMechatronics SCARA sketch. Only the conveyor relay (A1) is new.</text>
+
+  <!-- shield -->
+  <rect x="360" y="150" width="440" height="415" rx="10" fill="#1f5fa8" stroke="#123c6b" stroke-width="2"/>
+  <text x="580" y="180" text-anchor="middle" font-size="16" font-weight="bold" fill="#fff">CNC Shield V3</text>
+  <text x="580" y="198" text-anchor="middle" fill="#dfe9f5">on Arduino UNO (USB to the PC)</text>
+  <!-- driver slots -->
+  <g fill="#0f3d70" stroke="#dfe9f5">
+    <rect x="378" y="215" width="196" height="70" rx="4"/>
+    <rect x="586" y="215" width="196" height="70" rx="4"/>
+    <rect x="378" y="300" width="196" height="70" rx="4"/>
+    <rect x="586" y="300" width="196" height="70" rx="4"/>
+  </g>
+  <g fill="#fff" text-anchor="middle">
+    <text x="476" y="240" font-weight="bold">X  (D2 step, D5 dir)</text><text x="476" y="260">A4988, 1/4 step</text><text x="476" y="276" fill="#ffd34d">J1  theta1</text>
+    <text x="684" y="240" font-weight="bold">Y  (D3 step, D6 dir)</text><text x="684" y="260">A4988, 1/4 step</text><text x="684" y="276" fill="#ffd34d">J2  theta2</text>
+    <text x="476" y="325" font-weight="bold">Z  (D4 step, D7 dir)</text><text x="476" y="345">A4988, 1/4 step</text><text x="476" y="361" fill="#ffd34d">J3  phi (gripper turn)</text>
+    <text x="684" y="325" font-weight="bold">A  (D12 step, D13 dir)</text><text x="684" y="345">A-axis jumpers on D12/D13</text><text x="684" y="361" fill="#ffd34d">Z axis (lead screw)</text>
+  </g>
+  <text x="580" y="392" text-anchor="middle" fill="#fff">Micro-step jumpers: MS2 only on every driver = 1/4 step</text>
+  <text x="580" y="410" text-anchor="middle" fill="#fff">D8 = EN (LOW = motors on)</text>
+  <!-- headers -->
+  <rect x="378" y="425" width="404" height="128" rx="4" fill="#0f3d70" stroke="#dfe9f5"/>
+  <g fill="#fff">
+    <text x="392" y="447">End-stop / control headers</text>
+    <text x="392" y="469">D9  X-  : limit switch J3</text>
+    <text x="392" y="487">D10 Y-  : limit switch J2</text>
+    <text x="392" y="505">D11 Z-  : limit switch J1</text>
+    <text x="392" y="523">A3 CoolEn: limit switch Z     A0 Abort: servo signal</text>
+    <text x="392" y="541" fill="#9fe0b4">A1 Hold : conveyor relay (new)</text>
+  </g>
+
+  <!-- motors -->
+  <g stroke="#1d2730" stroke-width="2" fill="#e9edf0">
+    <rect x="40" y="210" width="250" height="56" rx="6"/>
+    <rect x="40" y="296" width="250" height="56" rx="6"/>
+    <rect x="900" y="210" width="250" height="56" rx="6"/>
+    <rect x="900" y="296" width="250" height="56" rx="6"/>
+  </g>
+  <g text-anchor="middle" fill="#1d2730">
+    <text x="165" y="234" font-weight="bold">NEMA 17 - J1 base</text><text x="165" y="253">20:1 belts, 44.444 steps/deg</text>
+    <text x="165" y="320" font-weight="bold">NEMA 17 (short) - J3</text><text x="165" y="339">4:1 belt, 10 steps/deg</text>
+    <text x="1025" y="234" font-weight="bold">NEMA 17 - J2 elbow</text><text x="1025" y="253">16:1 belts, 35.556 steps/deg</text>
+    <text x="1025" y="320" font-weight="bold">NEMA 17 - Z axis</text><text x="1025" y="339">8 mm lead, 100 steps/mm</text>
+  </g>
+  <g stroke="#1d2730" stroke-width="2" fill="none">
+    <path d="M290 238 H378"/><path d="M290 324 H378"/>
+    <path d="M900 238 H782"/><path d="M900 324 H782"/>
+  </g>
+
+  <!-- power -->
+  <rect x="40" y="420" width="260" height="70" rx="6" fill="#fff4cc" stroke="#b88a00" stroke-width="2"/>
+  <text x="170" y="446" text-anchor="middle" font-weight="bold">12 V supply, 6 A (min 4 A)</text>
+  <text x="170" y="466" text-anchor="middle">to the shield's screw terminal</text>
+  <path d="M300 455 H360" stroke="#b88a00" stroke-width="3"/>
+  <rect x="40" y="520" width="260" height="80" rx="6" fill="#fff4cc" stroke="#b88a00" stroke-width="2"/>
+  <text x="170" y="546" text-anchor="middle" font-weight="bold">5-6 V buck converter, 3 A</text>
+  <text x="170" y="566" text-anchor="middle">from the 12 V, powers the servo only</text>
+  <text x="170" y="586" text-anchor="middle">(never the Arduino 5 V pin)</text>
+  <path d="M170 490 V520" stroke="#b88a00" stroke-width="3"/>
+
+  <!-- servo -->
+  <rect x="900" y="420" width="250" height="70" rx="6" fill="#e9edf0" stroke="#1d2730" stroke-width="2"/>
+  <text x="1025" y="446" text-anchor="middle" font-weight="bold">MG996R gripper servo</text>
+  <text x="1025" y="466" text-anchor="middle">signal A0 (600-2500 us)</text>
+  <text x="1025" y="482" text-anchor="middle">180 deg = open</text>
+  <path d="M900 455 H840 V518 H782" stroke="#1d2730" stroke-width="2" fill="none"/>
+  <path d="M300 575 H330 V640 H1180 V455 H1150" stroke="#b88a00" stroke-width="2" fill="none"/>
+  <text x="700" y="634" text-anchor="middle" fill="#8a6800">servo + / - from the 5-6 V converter, ground also to the shield GND</text>
+
+  <!-- relay -->
+  <rect x="900" y="520" width="250" height="80" rx="6" fill="#e3f3e8" stroke="#2c8a4b" stroke-width="2"/>
+  <text x="1025" y="546" text-anchor="middle" font-weight="bold">Relay module - conveyor</text>
+  <text x="1025" y="566" text-anchor="middle">IN = A1 (Hold), VCC 5 V, GND</text>
+  <text x="1025" y="584" text-anchor="middle">COM/NO switch the belt motor</text>
+  <path d="M900 560 H820 V537 H782" stroke="#2c8a4b" stroke-width="2" fill="none"/>
+
+  <!-- switches -->
+  <rect x="360" y="580" width="440" height="40" rx="6" fill="#f2f4f6" stroke="#55616c"/>
+  <text x="580" y="605" text-anchor="middle">Limit switches: normally closed, between the pin and GND</text>
+
+  <text x="24" y="676" fill="#55616c">Switch inputs use INPUT_PULLUP: pressed = HIGH, as in the original homing(). If the EN pin is jumpered to GND (as some builds do),</text>
+  <text x="24" y="696" fill="#55616c">"Free motors" cannot switch the drivers off - remove that jumper to use it. Connect all grounds together.</text>
+</svg>

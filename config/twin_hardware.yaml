@@ -1,0 +1,20 @@
+# Digital-twin bridge settings (scripts/scara_twin_bridge.py).
+# Match these to YOUR HowToMechatronics SCARA before connecting the motors:
+#   firmware units: j1/j2/j3 in degrees, z in mm (0 = bottom, 170 = top switch)
+#   URDF joint = sign * (firmware value - offset)
+# Check: put the simulated arm at all-zero (RViz sliders) -> the real arm must be
+# straight out with the gripper square; if a joint turns the wrong way, flip its sign.
+scara_twin_bridge:
+  ros__parameters:
+    port: /dev/ttyACM0        # Arduino UNO (CH340 clones: /dev/ttyUSB0)
+    baud: 115200
+    rate: 20.0                # Hz, targets to the robot and feedback from it
+    homing: switches          # switches: home on the 4 limit switches (K) like the original build | zero: arm at the ready pose -> H | none
+    j1_sign: 1.0
+    j1_offset_deg: 0.0
+    j2_sign: 1.0
+    j2_offset_deg: 0.0
+    j3_sign: 1.0
+    j3_offset_deg: 0.0
+    z_zero_mm: 150.0          # firmware Z (mm) that equals shoulder_joint = 0
+    z_sign: 1.0

@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>SCARA Digital Twin</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="app">
+  <header class="bar">
+    <div class="brand">
+      <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true">
+        <rect x="4" y="22" width="12" height="8" rx="2" fill="#0a5cc2"/>
+        <rect x="8" y="6" width="4" height="17" fill="#0a5cc2"/>
+        <rect x="8" y="8" width="17" height="5" rx="2.5" fill="#0a5cc2"/>
+        <rect x="22" y="8" width="5" height="12" rx="2" fill="#1d2730"/>
+        <rect x="20" y="20" width="2" height="6" fill="#55616c"/><rect x="27" y="20" width="2" height="6" fill="#55616c"/>
+      </svg>
+      <div><h1>SCARA Digital Twin</h1><small id="subtitle">Not connected - tap the status to connect</small></div>
+    </div>
+    <button id="help" class="helpbtn" aria-label="How to use the app">?</button>
+    <button id="mic" class="helpbtn mic" aria-label="Voice command" title="Voice command (V)"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" fill="currentColor"/><path d="M6 11a6 6 0 0 0 12 0M12 17v4M8.5 21h7" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></svg></button>
+    <button id="conn" class="conn" data-state="off"><span class="dot"></span><span id="connText">Connect</span></button>
+    <button id="estop" class="estop" aria-label="Emergency stop">STOP</button>
+  </header>
+
+  <nav class="target" id="target" aria-label="What the controls move">
+    <button data-target="sim">Simulation<small id="simLabel">MuJoCo / Gazebo</small></button>
+    <button data-target="robot">Real robot<small id="robotLabel">not connected</small></button>
+    <button data-target="both">Twin<small>robot copies sim</small></button>
+  </nav>
+
+  <section class="screen" id="screen">
+    <canvas id="view"></canvas>
+    <div class="inset-frame" id="insetFrame"><span>Arm camera</span></div>
+    <div class="ticker" id="ticker"></div>
+    <div class="viewtools">
+      <button id="vHome">Front</button>
+      <button id="vTop">Top</button>
+      <button id="vFollow">Follow</button>
+      <button id="vCam" class="on">Arm camera</button>
+    </div>
+    <div class="hint" id="hint" hidden></div>
+    <div class="busy" id="busy" hidden></div>
+    <div class="handcam" id="handCam" hidden><canvas id="handView" width="80" height="60"></canvas><span id="handText">Hand control</span><button id="handCal" type="button">Learn again</button></div>
+    <video id="handVideo" playsinline muted hidden></video>
+  </section>
+
+  <section class="readout" id="readout">
+    <div><span>Column</span><b id="r0">0.0°</b><i class="ghost" id="g0"></i></div>
+    <div><span>Height</span><b id="r1">0 mm</b><i class="ghost" id="g1"></i></div>
+    <div><span>Elbow</span><b id="r2">0.0°</b><i class="ghost" id="g2"></i></div>
+    <div><span>Wrist</span><b id="r3">0.0°</b><i class="ghost" id="g3"></i></div>
+    <div><span>Gripper</span><b id="r4">open</b><i class="ghost" id="g4"></i></div>
+  </section>
+
+  <section class="panel">
+    <nav class="tabs" id="tabs">
+      <button data-tab="manual" class="on">Manual</button>
+      <button data-tab="cell">Auto</button>
+      <button data-tab="teach">Teach</button>
+      <button data-tab="robot">Robot</button>
+      <button data-tab="kin">FK / IK</button>
+    </nav>
+
+    <div class="tab on" data-tab="manual">
+      <div class="sticks">
+        <div class="stick"><div class="pad" id="stickL"><div class="knob"></div></div><div class="cap">Column ↔ &nbsp; Height ↕</div></div>
+        <div class="mid">
+          <button id="gOpen">Open</button>
+          <button id="gClose">Close</button>
+          <button id="home">Home</button>
+        </div>
+        <div class="stick"><div class="pad" id="stickR"><div class="knob"></div></div><div class="cap">Elbow ↔ &nbsp; Wrist ↕</div></div>
+      </div>
+      <div class="row">
+        <div class="seg" id="drive" aria-label="What the sticks move">
+          <button data-d="joints">Joints</button><button data-d="xy">XY + height</button>
+        </div>
+        <button id="tilt" style="flex:0 0 auto">Tilt</button>
+        <button id="hand" style="flex:0 0 auto" title="Drive with your hand in front of the camera">Hand</button>
+      </div>
+      <div class="row">
+        <span class="label" style="min-width:52px">Speed</span>
+        <input type="range" id="speed" min="10" max="100" step="5" value="60" aria-label="Speed">
+        <b id="speedVal" class="label" style="min-width:42px;text-align:right">60 %</b>
+      </div>
+      <div class="row">
+        <span class="label" style="min-width:52px">Gripper</span>
+        <input type="range" id="gripFine" min="0" max="100" step="5" value="0" aria-label="Gripper closed %">
+        <b id="gripVal" class="label" style="min-width:42px;text-align:right">open</b>
+      </div>
+      <div class="row">
+        <div class="seg" id="safety">
+          <button data-v="safe" class="on">Safe</button><button data-v="normal">Normal</button><button data-v="off">Off</button>
+        </div>
+        <button id="tapPick" style="flex:0 0 auto">Tap to move a puck</button>
+      </div>
+    </div>
+
+    <div class="tab" data-tab="cell">
+      <div class="seg" id="world" aria-label="Cell">
+        <button data-w="manual">Table</button><button data-w="sort">Sorting</button><button data-w="command">Command</button>
+      </div>
+      <div class="row">
+        <button id="beltRun" class="primary">Start</button>
+        <button id="beltStop">Stop</button>
+      </div>
+      <p class="note" id="cellNote">The conveyor cell runs in the PC simulation (sorting or command mode).</p>
+      <form class="row" id="cmdForm" autocomplete="off">
+        <input id="cmdText" placeholder='Type: "red then blue", "3 green", "any"' aria-label="Command">
+        <button type="button" id="mic2" class="micbtn" style="flex:0 0 auto" aria-label="Speak a command">Speak</button>
+        <button type="submit" style="flex:0 0 auto">Send</button>
+      </form>
+      <div class="colors" id="colors">
+        <button class="c-red" data-c="red">Red</button>
+        <button class="c-green" data-c="green">Green</button>
+        <button class="c-blue" data-c="blue">Blue</button>
+        <button class="c-yellow" data-c="yellow">Yellow</button>
+        <button data-c="any">Any colour</button>
+        <button data-c="none">Stop picking</button>
+      </div>
+      <div class="row">
+        <span class="label">Picking</span><div class="chips" id="active"></div>
+        <span class="label totals" id="totals" style="text-align:right"></span>
+      </div>
+      <div class="row">
+        <span class="label">Sequence</span><div class="chips" id="seq"></div>
+      </div>
+      <div class="row">
+        <button id="seqMode">Build a sequence</button>
+        <button id="seqRun" class="primary" disabled>Run sequence</button>
+      </div>
+      <div class="row" id="offlineCell">
+        <button id="addPuck">Add a puck</button>
+        <button id="resetWorld">Reset</button>
+        <span class="label" id="rate"></span>
+      </div>
+    </div>
+
+    <div class="tab" data-tab="teach">
+      <div class="row">
+        <button id="tSave" class="primary">Save this pose</button>
+        <button id="tPlay">Play</button>
+        <button id="tLoop">Loop</button>
+        <button id="tStop">Stop</button>
+      </div>
+      <div class="list" id="tList"></div>
+      <div class="row"><p class="note" id="tNote">Move the arm, save poses, then play them back in order.</p><button id="tClear" style="flex:0 0 auto">Clear all</button></div>
+      <h3 class="sub">Exact position</h3>
+      <div class="sliders" id="sliders">
+        <label><span>Column</span><input type="range" data-j="column_joint" step="any"><b></b></label>
+        <label><span>Height</span><input type="range" data-j="shoulder_joint" step="any"><b></b></label>
+        <label><span>Elbow</span><input type="range" data-j="forearm_joint" step="any"><b></b></label>
+        <label><span>Wrist</span><input type="range" data-j="wrist_joint" step="any"><b></b></label>
+      </div>
+    </div>
+
+    <div class="tab" data-tab="kin">
+      <div class="row tight kframe">
+        <span class="note">Frame</span>
+        <div class="seg" id="kFrame"><button data-f="robot" class="on">Robot</button><button data-f="world">World</button></div>
+      </div>
+      <h3 class="sub">Forward kinematics: where the gripper is now</h3>
+      <div class="kgrid" id="fk">
+        <div><span>X</span><b id="fkX">-</b></div><div><span>Y</span><b id="fkY">-</b></div>
+        <div><span>Pad height</span><b id="fkZ">-</b></div><div><span>Gripper yaw</span><b id="fkA">-</b></div>
+        <div><span>Reach</span><b id="fkR">-</b></div><div><span>Elbow</span><b id="fkE">-</b></div>
+      </div>
+      <div class="manip"><span>Manipulability</span><i><em id="fkM"></em></i><b id="fkMt">-</b></div>
+      <p class="note formula">x = L1·cos θ1 + L2·cos(θ1+θ2) + LT·cos(θ1+θ2+θ3)<br>y = L1·sin θ1 + L2·sin(θ1+θ2) + LT·sin(θ1+θ2+θ3)<br>
+        L1 = 228 mm, L2 = 136.5 mm, LT = 33.4 mm · yaw = θ1+θ2+θ3 · height = 160.5 mm + d</p>
+      <h3 class="sub">Inverse kinematics: go to a point</h3>
+      <div class="kin-in">
+        <label>X mm<input id="kX" type="number" step="1" inputmode="decimal"></label>
+        <label>Y mm<input id="kY" type="number" step="1" inputmode="decimal"></label>
+        <label>Height mm<input id="kZ" type="number" step="1" inputmode="decimal"></label>
+        <label>Yaw °<input id="kA" type="number" step="1" inputmode="decimal"></label>
+      </div>
+      <div class="row">
+        <button id="kHere">Use the gripper's pose</button>
+        <button id="kTap">Tap the table</button>
+      </div>
+      <div class="ksol" id="kSol"></div>
+      <label class="check"><input type="checkbox" id="kReach" checked> Show the reachable area on the table</label>
+    </div>
+
+    <div class="tab" data-tab="robot">
+      <div class="row">
+        <select id="port" aria-label="Serial port of the robot"><option value="">Serial port…</option></select>
+        <button id="ports" style="flex:0 0 auto">Refresh</button>
+      </div>
+      <div class="row">
+        <button id="rConnect" class="primary">Connect robot</button>
+        <button id="rFake">Software robot</button>
+        <button id="rDisc">Disconnect</button>
+      </div>
+      <div class="row">
+        <button id="rZero">Zero here</button>
+        <button id="rHome">Home switches</button>
+        <button id="rFree">Motors free</button>
+        <button id="rLock">Motors on</button>
+      </div>
+      <div id="cellTeach" hidden>
+        <p class="note">Camera cell: jog the real arm to each spot, then save it.</p>
+        <div class="colors" id="teachBtns">
+          <button data-what="pick">Pick point</button>
+          <button data-what="upstream">Upstream</button>
+          <button data-what="ready">Parking</button>
+          <button data-what="drop_red">Drop red</button>
+          <button data-what="drop_green">Drop green</button>
+          <button data-what="drop_blue">Drop blue</button>
+          <button data-what="drop_yellow">Drop yellow</button>
+          <button data-what="drop_any">Drop (one bin)</button>
+        </div>
+      </div>
+      <h3 class="sub">Activity</h3>
+      <div class="log" id="log"></div>
+      <p class="note" id="rNote">Plug the robot into the PC running SCARA Twin Control, pick its port and connect. Then press Home switches (or, without limit switches, put the arm in the ready pose and press Zero here).</p>
+    </div>
+  </section>
+</div>
+
+<div class="sheet" id="sheet" hidden>
+  <form class="card" id="connForm">
+    <h2>Connect to the PC</h2>
+    <p class="note">On the PC run <b>scara_twin_server.py</b> (MuJoCo, Gazebo or real robot). It prints the address to type here. Phone and PC must be on the same Wi-Fi.</p>
+    <div class="fields">
+      <label>PC address<input id="ip" inputmode="decimal" autocomplete="off" placeholder="192.168.1.50"></label>
+      <label>Port<input id="portNo" inputmode="numeric" value="9090"></label>
+    </div>
+    <div class="row">
+      <button type="submit" class="primary">Connect</button>
+      <button type="button" id="demo">Try offline</button>
+      <button type="button" id="closeSheet">Close</button>
+    </div>
+  </form>
+</div>
+<div class="sheet" id="helpSheet" hidden>
+  <div class="card help">
+    <h2>How to use the app</h2>
+    <div class="helpbody">
+      <h3>Connect</h3>
+      <p>On the PC start <b>scara_twin_server.py</b> (MuJoCo, Gazebo or the real robot). It prints an address
+      like 192.168.1.50 - tap the status pill at the top, type it, port 9090, Connect. Same Wi-Fi.
+      No PC? <b>Try offline</b> runs the robot, the table and the conveyor cell on the phone.</p>
+      <h3>What you control</h3>
+      <p><b>Simulation</b> moves the simulated arm, <b>Real robot</b> the real one, <b>Twin</b> both (the real
+      robot copies the simulation). The big red <b>STOP</b> freezes everything; tap it again to release.</p>
+      <h3>Manual tab</h3>
+      <p><b>Joints</b>: left stick = column (left/right) and height (up/down), right stick = elbow and wrist.
+      <b>XY + height</b>: left stick moves the gripper over the table in straight lines (up on the stick =
+      away from you in the 3-D view), right stick = height (up/down) and wrist turn (left/right).
+      <b>Tilt</b> drives with the phone's tilt instead of the left stick.</p>
+      <p>To pick: open the gripper, bring it over the puck, lower it. When it is within about 4 cm the
+      gripper centres itself (pick assist). Go all the way down, press <b>Close</b>, lift.
+      Move, lower, <b>Open</b>. The gripper slider closes it part way.</p>
+      <p><b>Safe</b> is slow with all guards, <b>Normal</b> faster, <b>Off</b> no limits.
+      <b>Tap to move a puck</b>: tap a puck in the 3-D view, then tap where it should go - the robot does it.</p>
+      <h3>Auto tab</h3>
+      <p><b>Sorting</b>: every colour goes into its own bin. <b>Command</b>: one bin, the robot picks only the
+      colour you choose and keeps picking it until you choose another one. <b>Any colour</b> picks
+      everything, <b>Stop picking</b> lets everything pass. <b>Build a sequence</b>: tap colours in order,
+      then Run - one of each, in that order. Or type / dictate in the box: "red then blue", "3 green",
+      "any", "stop", "start". <b>Start / Stop</b> run the conveyor.</p>
+      <h3>Voice</h3>
+      <p>Tap the <b>microphone</b> at the top (or <b>Speak</b> in the Auto tab) and say what you want:
+      "red", "red then blue", "3 green", "any colour", "stop picking", "start", "stop", "open", "close",
+      "home", "sorting", "command mode", "table", "emergency stop", "resume". On the phone it uses the phone's
+      own speech recogniser (offline if the phone has offline speech installed); in a browser it needs Chrome.</p>
+      <h3>Hand control</h3>
+      <p>Manual tab, <b>Hand</b>: hold your open palm in the yellow square of the small camera picture for two
+      seconds. Then your hand is the left joystick: keep it in the circle to stand still, move it to move the
+      arm. Make a fist to close the gripper, open your hand to open it. Plain background and even light help;
+      <b>Learn again</b> if the light changes.</p>
+      <h3>Teach tab</h3>
+      <p>Move the arm, <b>Save this pose</b>, repeat, then <b>Play</b> (or <b>Loop</b>). Go / Delete per pose.
+      <b>Exact position</b> sliders put each joint exactly where you want it.</p>
+      <h3>Robot tab</h3>
+      <p>Pick the robot's port on the PC, <b>Connect robot</b> (or <b>Software robot</b> to try), then
+      <b>Home switches</b>. Motors free / on, and in camera-cell mode the pose buttons for the real conveyor cell.</p>
+      <h3>FK / IK tab</h3>
+      <p>Live <b>forward kinematics</b>: where the gripper is (X, Y, height, yaw), its reach, the elbow side and how far
+      it is from the straight-arm singularity. <b>Inverse kinematics</b>: type a point (or <b>Tap the table</b>), see both
+      elbow solutions with their joint limits, press <b>Go</b>. Robot frame = origin on the column axis.</p>
+      <h3>View</h3>
+      <p>Drag to turn, pinch (or mouse wheel) to zoom. Front / Top / Follow (the camera follows the gripper). The small
+      window is the arm camera on the forearm.</p>
+      <h3>Keyboard (computer)</h3>
+      <p>A/D column, W/S height, J/L elbow, I/K wrist, G close, O open, H home, P save pose, V voice,
+      Space stop / release.</p>
+    </div>
+    <button id="closeHelp" class="primary">Got it</button>
+  </div>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script src="lib/three.min.js"></script>
+<script src="lib/OrbitControls.js"></script>
+<script src="scene.js"></script>
+<script src="sim.js"></script>
+<script src="voice.js"></script>
+<script src="hand.js"></script>
+<script src="meshes.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

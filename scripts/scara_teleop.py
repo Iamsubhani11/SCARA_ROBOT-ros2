@@ -1,162 +1,175 @@
 #!/usr/bin/env python3
+"""
+Keyboard control of the Gazebo SCARA (manual table world).
 
-import sys
+    ros2 launch scara_description gazebo.launch.py mode:=manual     # terminal 1
+    python3 scripts/scara_teleop.py                                  # terminal 2
+    python3 scripts/scara_teleop.py --safety normal                  # faster
+
+Every key changes a joint target; the targets go through the safety filter
+(scripts/scara_safety.py) and are streamed to the controllers 20 times a second,
+so the arm always moves smoothly at the safety mode's speed.
+"""
+import argparse
+import os
 import select
+import sys
 import termios
+import time
 import tty
+
 import rclpy
-from rclpy.node import Node
-from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from builtin_interfaces.msg import Duration
+from rclpy.node import Node
+from sensor_msgs.msg import JointState
+from tf2_msgs.msg import TFMessage
+from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import scara_scene as S     # noqa: E402
+import scara_safety as SF   # noqa: E402
 
 HELP_MSG = """
 ==================================================
-        SCARA Robot Teleoperation Interface
+        SCARA Robot Teleoperation (Gazebo)
 ==================================================
-Control the 5-DOF SCARA robot joints using keys:
+The robot faces you, so "left" means YOUR left.
 
-  Base Column Rotation (column_joint):
-    [a] : Turn Left  (+0.05 rad)
-    [d] : Turn Right (-0.05 rad)
+  [a] / [d] : column - swing the arm to your left / right
+  [w] / [s] : Z axis up / down
+  [j] / [l] : forearm to your left / right
+  [i] / [k] : wrist turn
+  [o]       : close gripper (grips the puck: it fits between the open fingers)
+  [u]       : open gripper
+  [h]       : home (all joints 0, gripper open)
 
-  Shoulder Vertical Axis (shoulder_joint):
-    [w] : Lift Up   (+0.005 m)
-    [s] : Move Down (-0.005 m)
+  [SPACE]   : EMERGENCY STOP on / off
+  [m]       : next safety mode (safe -> normal -> off)
+  [q] / Ctrl+C : quit
 
-  Forearm Rotation (forearm_joint):
-    [j] : Rotate Left  (+0.05 rad)
-    [l] : Rotate Right (-0.05 rad)
-
-  Wrist Rotation (wrist_joint):
-    [i] : Pitch/Roll Up   (+0.1 rad)
-    [k] : Pitch/Roll Down (-0.1 rad)
-
-  Gripper (left_finger_joint):
-    [u] : Open Gripper  (-0.05 m)
-    [o] : Close Gripper ( 0.00 m)
-
-  General:
-    [h] : Reset to Home Position
-    [q] / Ctrl+C : Quit Teleoperation
+Safe / normal mode: when you lower the open gripper close to a puck it centres
+itself over it, and a finger never presses down on a puck.
 ==================================================
 """
 
-# Joint limits
-LIMITS = {
-    'column_joint': (-2.0, 2.0),
-    'shoulder_joint': (-0.15, 0.02),
-    'forearm_joint': (-2.0, 2.0),
-    'wrist_joint': (-4.712, 4.712),
-    'left_finger_joint': (-0.06, 0.0)
-}
+STEP = {'a': (0, -0.05), 'd': (0, 0.05), 'w': (1, 0.005), 's': (1, -0.005),
+        'j': (2, -0.05), 'l': (2, 0.05), 'i': (3, 0.1), 'k': (3, -0.1)}
+
 
 class ScaraTeleopNode(Node):
-    def __init__(self):
+    def __init__(self, safety='safe', assist=True):
         super().__init__('scara_teleop')
         self.arm_pub = self.create_publisher(JointTrajectory, '/arm_controller/joint_trajectory', 10)
         self.gripper_pub = self.create_publisher(JointTrajectory, '/gripper_controller/joint_trajectory', 10)
+        self.create_subscription(JointState, '/joint_states', self.on_js, 10)
+        self.create_subscription(TFMessage, '/scara/world_poses', self.on_poses, 10)
+        self.js = {}
+        self.pucks = {}
+        self.target = None                 # [col, z, fore, wrist] - starts from the robot's pose
+        self.grip = S.GRIPPER_OPEN
+        self.filt = SF.SafetyFilter(safety, assist=assist)
+        self.last = time.time()
+        self.last_grip = None
+        self.last_note = ''
+        self.get_logger().info('SCARA keyboard teleop started - waiting for /joint_states')
 
-        self.arm_joints = ['column_joint', 'shoulder_joint', 'forearm_joint', 'wrist_joint']
-        self.gripper_joints = ['left_finger_joint']
+    def on_js(self, msg):
+        for n, p in zip(msg.name, msg.position):
+            self.js[n] = p
 
-        # Initial positions
-        self.arm_pos = [0.0, 0.0, 0.0, 0.0]
-        self.gripper_pos = [0.0]
+    def on_poses(self, msg):
+        for t in msg.transforms:
+            name = (t.child_frame_id or '').split('::')[0]
+            if name.startswith('puck_'):
+                p = t.transform.translation
+                self.pucks[name] = (p.x, p.y, p.z)
 
-        self.get_logger().info("SCARA Teleop Node started.")
+    def ready(self):
+        if self.target is None and all(n in self.js for n in S.ARM_JOINTS):
+            self.target = [self.js[n] for n in S.ARM_JOINTS]
+            self.grip = self.js.get('left_finger_joint', S.GRIPPER_OPEN)
+            self.get_logger().info('Robot found - use the keys.')
+        return self.target is not None
 
-    def clamp(self, val, min_val, max_val):
-        return max(min_val, min(max_val, val))
+    def key(self, k):
+        if k in STEP:
+            i, d = STEP[k]
+            lo, hi = S.LIMITS[S.ARM_JOINTS[i]]
+            self.target[i] = min(max(self.target[i] + d, lo), hi)
+        elif k == 'o':
+            self.grip = S.GRIP_CLOSE
+        elif k == 'u':
+            self.grip = S.GRIPPER_OPEN
+        elif k == 'h':
+            self.target = [0.0, 0.0, 0.0, 0.0]
+            self.grip = S.GRIPPER_OPEN
+        elif k == ' ':
+            self.filt.estop = not self.filt.estop
+            self.get_logger().warn('EMERGENCY STOP' if self.filt.estop else 'stop released')
+        elif k == 'm':
+            self.filt.set_mode(SF.next_mode(self.filt.mode))
+            self.get_logger().info(f'safety mode: {self.filt.mode}')
 
-    def publish_arm(self):
+    def tick(self):
+        now = time.time()
+        dt, self.last = now - self.last, now
+        qm = [self.js[n] for n in S.ARM_JOINTS]
+        q, g = self.filt.filter(self.target, self.grip, dt, q_meas=qm, grip_meas=self.js.get('left_finger_joint'),
+                                pucks=list(self.pucks.values()))
+        self.target = list(q) if self.filt.estop else self.filt.clamp_back(self.target)
+        if self.filt.note and self.filt.note != self.last_note:
+            self.get_logger().info(self.filt.note)
+        self.last_note = self.filt.note
+        self.publish(self.arm_pub, S.ARM_JOINTS, q)
+        if self.last_grip is None or abs(g - self.last_grip) > 1e-4:
+            self.publish(self.gripper_pub, S.GRIPPER_JOINTS, [g, g])     # both fingers
+            self.last_grip = g
+
+    @staticmethod
+    def publish(pub, names, positions):
         msg = JointTrajectory()
-        msg.joint_names = self.arm_joints
+        msg.joint_names = list(names)
         point = JointTrajectoryPoint()
-        point.positions = [float(p) for p in self.arm_pos]
-        point.time_from_start = Duration(sec=0, nanosec=200000000)
+        point.positions = [float(p) for p in positions]
+        point.time_from_start = Duration(sec=0, nanosec=100_000_000)
         msg.points = [point]
-        self.arm_pub.publish(msg)
-
-    def publish_gripper(self):
-        msg = JointTrajectory()
-        msg.joint_names = self.gripper_joints
-        point = JointTrajectoryPoint()
-        point.positions = [float(p) for p in self.gripper_pos]
-        point.time_from_start = Duration(sec=0, nanosec=200000000)
-        msg.points = [point]
-        self.gripper_pub.publish(msg)
-
-    def update_arm_joint(self, idx, delta):
-        j_name = self.arm_joints[idx]
-        low, high = LIMITS[j_name]
-        self.arm_pos[idx] = self.clamp(self.arm_pos[idx] + delta, low, high)
-        self.get_logger().info(f"Updated {j_name}: {self.arm_pos[idx]:.3f}")
-        self.publish_arm()
-
-    def update_gripper(self, target_pos):
-        low, high = LIMITS['left_finger_joint']
-        self.gripper_pos[0] = self.clamp(target_pos, low, high)
-        self.get_logger().info(f"Updated gripper: {self.gripper_pos[0]:.3f}")
-        self.publish_gripper()
-
-    def home(self):
-        self.arm_pos = [0.0, 0.0, 0.0, 0.0]
-        self.gripper_pos = [0.0]
-        self.get_logger().info("Reset to HOME position")
-        self.publish_arm()
-        self.publish_gripper()
+        pub.publish(msg)
 
 
-def getKey(settings):
+def get_key(settings, timeout=0.05):
     tty.setraw(sys.stdin.fileno())
-    rlist, _, _ = select.select([sys.stdin], [], [], 0.1)
-    if rlist:
-        key = sys.stdin.read(1)
-    else:
-        key = ''
+    rlist, _, _ = select.select([sys.stdin], [], [], timeout)
+    key = sys.stdin.read(1) if rlist else ''
     termios.tcsetattr(sys.stdin, termios.TCSADRAIN, settings)
     return key
 
 
 def main():
+    ap = argparse.ArgumentParser(description='SCARA keyboard control (Gazebo)')
+    SF.add_args(ap)
+    args, ros_args = ap.parse_known_args()
     settings = termios.tcgetattr(sys.stdin)
-    rclpy.init()
-    node = ScaraTeleopNode()
+    rclpy.init(args=ros_args)
+    node = ScaraTeleopNode(args.safety, not args.no_assist)
     print(HELP_MSG)
-
     try:
         while rclpy.ok():
-            key = getKey(settings)
-            if key == 'a':
-                node.update_arm_joint(0, 0.05)
-            elif key == 'd':
-                node.update_arm_joint(0, -0.05)
-            elif key == 'w':
-                node.update_arm_joint(1, 0.005)
-            elif key == 's':
-                node.update_arm_joint(1, -0.005)
-            elif key == 'j':
-                node.update_arm_joint(2, 0.05)
-            elif key == 'l':
-                node.update_arm_joint(2, -0.05)
-            elif key == 'i':
-                node.update_arm_joint(3, 0.1)
-            elif key == 'k':
-                node.update_arm_joint(3, -0.1)
-            elif key == 'u':
-                node.update_gripper(-0.05)
-            elif key == 'o':
-                node.update_gripper(0.0)
-            elif key == 'h':
-                node.home()
-            elif key == 'q' or key == '\x03':
+            key = get_key(settings).lower()
+            for _ in range(20):                       # drain queued /joint_states etc.
+                rclpy.spin_once(node, timeout_sec=0.0)
+            if key in ('q', '\x03'):
                 break
-    except Exception as e:
-        print(e)
+            if not node.ready():
+                continue
+            if key:
+                node.key(key)
+            node.tick()
     finally:
         termios.tcsetattr(sys.stdin, termios.TCSADRAIN, settings)
         node.destroy_node()
-        rclpy.shutdown()
+        if rclpy.ok():
+            rclpy.shutdown()
+
 
 if __name__ == '__main__':
     main()

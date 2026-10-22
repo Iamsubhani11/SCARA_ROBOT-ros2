@@ -1,5 +1,7 @@
 build/
 install/
 log/
+__pycache__/
+*.pyc
 MJMODEL.TXT
 MUJOCO_LOG.TXT

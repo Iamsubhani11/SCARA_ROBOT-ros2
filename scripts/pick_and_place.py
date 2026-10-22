@@ -1,107 +1,53 @@
 #!/usr/bin/env python3
+"""
+Ask the running cell for ONE puck and wait until it is in the bin.
 
+    ros2 launch scara_description gazebo.launch.py mode:=command      # terminal 1
+    python3 scripts/pick_and_place.py red                               # terminal 2: next red puck
+    python3 scripts/pick_and_place.py red 3                             # three red pucks
+    python3 scripts/pick_and_place.py                                   # the next puck of any colour
+
+It publishes "1 red" (a count, so the robot stops after it - a plain colour
+stays active until the next one) on /scara/pick_color and prints /scara/status
+until the robot reports the puck(s) placed.
+"""
+import sys
 import time
+
 import rclpy
 from rclpy.node import Node
-from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
-from builtin_interfaces.msg import Duration
+from std_msgs.msg import String
 
-class ScaraPickAndPlace(Node):
-    def __init__(self):
-        super().__init__('scara_pick_and_place')
-        self.arm_pub = self.create_publisher(JointTrajectory, '/arm_controller/joint_trajectory', 10)
-        self.gripper_pub = self.create_publisher(JointTrajectory, '/gripper_controller/joint_trajectory', 10)
-
-        self.arm_joints = ['column_joint', 'shoulder_joint', 'forearm_joint', 'wrist_joint']
-        self.gripper_joints = ['left_finger_joint']
-
-        self.get_logger().info("SCARA Yellow Puck Pick-and-Place Controller Node started.")
-
-    def send_arm_cmd(self, positions, duration_sec=1.5):
-        msg = JointTrajectory()
-        msg.joint_names = self.arm_joints
-        point = JointTrajectoryPoint()
-        point.positions = [float(p) for p in positions]
-        secs = int(duration_sec)
-        nsecs = int((duration_sec - secs) * 1e9)
-        point.time_from_start = Duration(sec=secs, nanosec=nsecs)
-        msg.points = [point]
-        self.arm_pub.publish(msg)
-
-    def send_gripper_cmd(self, position, duration_sec=1.0):
-        msg = JointTrajectory()
-        msg.joint_names = self.gripper_joints
-        point = JointTrajectoryPoint()
-        point.positions = [float(position)]
-        secs = int(duration_sec)
-        nsecs = int((duration_sec - secs) * 1e9)
-        point.time_from_start = Duration(sec=secs, nanosec=nsecs)
-        msg.points = [point]
-        self.gripper_pub.publish(msg)
-
-    def run_sequence(self):
-        self.get_logger().info("=== Starting Automated Pick and Place Routine for Yellow Puck ===")
-
-        # Step 1: Initial Home Position & Open Gripper
-        self.get_logger().info("[Step 1] Initializing Home Position & Opening Gripper...")
-        self.send_arm_cmd([0.0, 0.0, 0.0, 0.0], duration_sec=2.0)
-        self.send_gripper_cmd(-0.05, duration_sec=1.5)
-        time.sleep(2.5)
-
-        # Step 2: Pre-Pick Position over Yellow Puck on Conveyor Track
-        self.get_logger().info("[Step 2] Traversing SCARA Arm over Yellow Puck on Conveyor...")
-        self.send_arm_cmd([-0.32, 0.0, 0.75, 0.0], duration_sec=2.0)
-        time.sleep(2.5)
-
-        # Step 3: Descend Z-Axis to Grasp Yellow Puck
-        self.get_logger().info("[Step 3] Descending Z-Axis to Grasp Yellow Puck...")
-        self.send_arm_cmd([-0.32, -0.14, 0.75, 0.0], duration_sec=1.5)
-        time.sleep(2.0)
-
-        # Step 4: Grasp Yellow Puck with Gripper
-        self.get_logger().info("[Step 4] Closing Gripper Fingers around Yellow Puck...")
-        self.send_gripper_cmd(0.0, duration_sec=1.5)
-        time.sleep(2.0)
-
-        # Step 5: Lift Yellow Puck off Conveyor Track
-        self.get_logger().info("[Step 5] Lifting Yellow Puck off Conveyor Track...")
-        self.send_arm_cmd([-0.32, 0.0, 0.75, 0.0], duration_sec=1.5)
-        time.sleep(2.0)
-
-        # Step 6: Swing Arm to Wooden Table Drop-Off Zone
-        self.get_logger().info("[Step 6] Traversing Arm across Wooden Table Platform...")
-        self.send_arm_cmd([0.785, 0.0, 0.85, 0.0], duration_sec=2.5)
-        time.sleep(3.0)
-
-        # Step 7: Descend Z-Axis to Table Surface
-        self.get_logger().info("[Step 7] Descending Z-Axis onto Wooden Table Surface...")
-        self.send_arm_cmd([0.785, -0.10, 0.85, 0.0], duration_sec=1.5)
-        time.sleep(2.0)
-
-        # Step 8: Release Yellow Puck
-        self.get_logger().info("[Step 8] Releasing Gripper...")
-        self.send_gripper_cmd(-0.05, duration_sec=1.5)
-        time.sleep(2.0)
-
-        # Step 9: Retract Z-Axis
-        self.get_logger().info("[Step 9] Retracting Z-Axis...")
-        self.send_arm_cmd([0.785, 0.0, 0.85, 0.0], duration_sec=1.5)
-        time.sleep(2.0)
-
-        # Step 10: Return Home
-        self.get_logger().info("[Step 10] Returning SCARA Arm to Home Position...")
-        self.send_arm_cmd([0.0, 0.0, 0.0, 0.0], duration_sec=2.0)
-        time.sleep(2.5)
-
-        self.get_logger().info("=== Automated Yellow Puck Pick-and-Place Routine Completed ===")
 
 def main():
+    args = [a for a in sys.argv[1:] if not a.startswith('-')]
+    color = args[0].lower() if args else 'any'
+    count = int(args[1]) if len(args) > 1 and args[1].isdigit() else 1
     rclpy.init()
-    node = ScaraPickAndPlace()
-    time.sleep(1.0)
-    node.run_sequence()
+    node = Node('scara_pick_once')
+    done = {'ok': False, 'n': 0}
+
+    def on_status(msg):
+        print('[cell]', msg.data)
+        if msg.data.startswith('Placed'):
+            done['n'] += 1
+            done['ok'] = done['n'] >= count
+
+    node.create_subscription(String, '/scara/status', on_status, 10)
+    pub = node.create_publisher(String, '/scara/pick_color', 10)
+    t0 = time.time()
+    while pub.get_subscription_count() == 0 and time.time() - t0 < 10.0:
+        rclpy.spin_once(node, timeout_sec=0.2)       # wait for the sorter node
+    if pub.get_subscription_count() == 0:
+        print('No colour sorter is listening - start: ros2 launch scara_description gazebo.launch.py mode:=command')
+    pub.publish(String(data=f'{count} {color}'))
+    print(f'Asked for: {count} x {color}')
+    t0 = time.time()
+    while rclpy.ok() and not done['ok'] and time.time() - t0 < 300.0:
+        rclpy.spin_once(node, timeout_sec=0.2)
     node.destroy_node()
     rclpy.shutdown()
+
 
 if __name__ == '__main__':
     main()

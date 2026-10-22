@@ -3,6 +3,10 @@
 
     <!-- Load Simulated or Real Hardware Interfaces -->
     <xacro:arg name="is_sim" default="true"/>
+    <!-- Raised name on top of the shoulder link (meshes/shoulder_name.stl, made by
+         tools/make_name_mesh.py). The launch files switch it on automatically when
+         that mesh file exists; by hand: xacro scara.urdf.xacro name_plate:=true -->
+    <xacro:arg name="name_plate" default="false"/>
 
     <xacro:include filename="$(find scara_description)/urdf/arm.xacro" />
     

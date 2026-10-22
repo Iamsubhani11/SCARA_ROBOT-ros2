@@ -1,190 +1,151 @@
 #!/usr/bin/env python3
+"""
+Two-hand gesture control of the SCARA in Gazebo (ROS 2).
 
+    LEFT hand : left/right = base column,  up/down = Z height
+    RIGHT hand: left/right = forearm,      tilt = wrist,  pinch thumb+index = close gripper
+    FIST      : freeze that hand's joints      Hand out of view: hold
+    q / Esc in the camera window: quit
+
+Start Gazebo first (no sorter, so they don't fight over the arm):
+    ros2 launch scara_description gazebo.launch.py mode:=manual
+    python3 gesture_control/gesture_control_ros2.py
+    python3 gesture_control/gesture_control_ros2.py --ros-args -p camera:=1 -p safety:=normal
+
+Parameters: camera (default 0), rate (publish Hz, default 20),
+            safety safe|normal|off (default safe), assist true|false (default true)
+In the camera window: q / Esc quit, SPACE emergency stop on/off, m next safety mode.
+Safety mode (scripts/scara_safety.py): slow joints + gentle gripper, pick assist
+(the open gripper centres itself over a puck - puck poses from /scara/world_poses),
+a guard against pressing a finger down on a puck, table floor, emergency stop.
+"""
 import os
 import sys
 import time
+
 import cv2
-import numpy as np
-import rclpy
-from rclpy.node import Node
-from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 import mediapipe as mp
+import rclpy
+from builtin_interfaces.msg import Duration
+from rclpy.node import Node
+from sensor_msgs.msg import JointState
+from tf2_msgs.msg import TFMessage
+from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 
-def count_extended_fingers(lm):
-    tips = [4, 8, 12, 16, 20]
-    pips = [2, 6, 10, 14, 18]
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import gesture_core as G   # noqa: E402
+S = G.S
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'scripts'))
+import scara_safety as SF   # noqa: E402
 
-    extended = []
-    if abs(lm[4].x - lm[0].x) > 0.08 and (lm[4].x > lm[2].x or lm[4].y < lm[3].y):
-        extended.append(1)
-    else:
-        extended.append(0)
 
-    for i in range(1, 5):
-        if lm[tips[i]].y < lm[pips[i]].y:
-            extended.append(1)
-        else:
-            extended.append(0)
-
-    return extended
-
-class SCARAGestureControllerROS2(Node):
+class GestureNode(Node):
     def __init__(self):
-        super().__init__('scara_gesture_controller_ros2')
-
+        super().__init__('scara_gesture_control')
+        self.declare_parameter('camera', 0)
+        self.declare_parameter('rate', 20.0)
+        self.declare_parameter('safety', 'safe')
+        self.declare_parameter('assist', True)
+        self.filt = SF.SafetyFilter(str(self.get_parameter('safety').value),
+                                    assist=bool(self.get_parameter('assist').value))
+        self.pucks = {}
+        self.create_subscription(TFMessage, '/scara/world_poses', self.on_poses, 10)
         self.arm_pub = self.create_publisher(JointTrajectory, '/arm_controller/joint_trajectory', 10)
-        self.gripper_pub = self.create_publisher(JointTrajectory, '/gripper_controller/joint_trajectory', 10)
-
-        self.get_logger().info("==================================================================")
-        self.get_logger().info("=== SCARA Finger Select + Hand Tilt ROS 2 Controller Started ===")
-        self.get_logger().info("==================================================================")
-
-        # Initialize MediaPipe
-        self.mp_hands = mp.solutions.hands
-        self.hands = self.mp_hands.Hands(
-            static_image_mode=False,
-            max_num_hands=1,
-            min_detection_confidence=0.6,
-            min_tracking_confidence=0.6
-        )
-        self.mp_draw = mp.solutions.drawing_utils
-
-        # Camera Capture
-        self.cap = cv2.VideoCapture(0)
+        self.grip_pub = self.create_publisher(JointTrajectory, '/gripper_controller/joint_trajectory', 10)
+        self.js = {}
+        self.create_subscription(JointState, '/joint_states', self.on_js, 20)
+        self.cap = cv2.VideoCapture(int(self.get_parameter('camera').value))
         if not self.cap.isOpened():
-            self.get_logger().warn("Webcam camera index 0 not detected.")
+            self.get_logger().error('Cannot open the webcam (parameter camera:=<index>)')
+        self.hands = mp.solutions.hands.Hands(static_image_mode=False, max_num_hands=2, model_complexity=1,
+                                              min_detection_confidence=0.6, min_tracking_confidence=0.6)
+        self.draw = mp.solutions.drawing_utils
+        self.mapper = None
+        self.last_grip = None
+        self.last_t = time.time()
+        self.period = 1.0 / float(self.get_parameter('rate').value)
+        self.create_timer(1.0 / 30.0, self.loop)
+        self.get_logger().info('Gesture control: show BOTH hands. Left = column + Z, right = forearm + wrist, pinch = grip.')
 
-        # Current Joint Positions
-        self.curr_column = 0.0
-        self.curr_shoulder = 0.0
-        self.curr_forearm = 0.0
-        self.curr_wrist = 0.0
-        self.curr_gripper = -0.05
+    def on_js(self, msg):
+        for n, p in zip(msg.name, msg.position):
+            self.js[n] = p
 
-        # Speed constants
-        self.SPEED_COLUMN = 0.025
-        self.SPEED_SHOULDER = 0.002
-        self.SPEED_FOREARM = 0.025
-        self.SPEED_WRIST = 0.035
+    def on_poses(self, msg):
+        for t in msg.transforms:
+            name = (t.child_frame_id or '').split('::')[0]
+            if name.startswith('puck_'):
+                p = t.transform.translation
+                self.pucks[name] = (p.x, p.y, p.z)
 
-        self.timer = self.create_timer(0.05, self.process_frame)
+    def start_mapper(self):
+        """Start from where the robot really is, so it never jumps."""
+        j = self.js
+        self.mapper = G.GestureMapper({'column': j.get('column_joint', 0.0), 'z': j.get('shoulder_joint', 0.0),
+                                       'forearm': j.get('forearm_joint', 0.0), 'wrist': j.get('wrist_joint', 0.0),
+                                       'gripper': j.get('left_finger_joint', S.GRIPPER_OPEN)})
+        self.get_logger().info('Robot state received - gesture control active')
 
-    def process_frame(self):
-        if not self.cap.isOpened():
+    def publish(self, names, positions, pub, t):
+        msg = JointTrajectory()
+        msg.joint_names = names
+        pt = JointTrajectoryPoint()
+        pt.positions = [float(p) for p in positions]
+        pt.time_from_start = Duration(sec=0, nanosec=int(t * 1e9))
+        msg.points = [pt]
+        pub.publish(msg)
+
+    def loop(self):
+        ok, frame = self.cap.read() if self.cap.isOpened() else (False, None)
+        if not ok:
             return
+        frame = cv2.flip(frame, 1)                  # mirror view = MediaPipe's handedness convention
+        now = time.time()
+        dt = min(0.1, now - self.last_t)
+        self.last_t = now
+        res = self.hands.process(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+        hands = []
+        if res.multi_hand_landmarks:
+            for lms, handed in zip(res.multi_hand_landmarks, res.multi_handedness or [None] * 8):
+                arr = [[p.x, p.y, p.z] for p in lms.landmark]
+                label = handed.classification[0].label if handed else None
+                hands.append((G.np.array(arr), label))
+                self.draw.draw_landmarks(frame, lms, mp.solutions.hands.HAND_CONNECTIONS)
+        if self.mapper is None:
+            if self.js:
+                self.start_mapper()
+            else:
+                cv2.putText(frame, 'Waiting for /joint_states (is Gazebo running?)', (10, 60),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
+                cv2.imshow('SCARA Hand Control', frame)
+                cv2.waitKey(1)
+                return
+        _, grip = self.mapper.update(hands, now, dt)
+        qm = [self.js.get(n, 0.0) for n in S.ARM_JOINTS]
+        q, grip = self.filt.filter(self.mapper.arm_vector(), grip, dt, q_meas=qm,
+                                   grip_meas=self.js.get('left_finger_joint'), pucks=list(self.pucks.values()))
+        self.mapper.note = f'[{self.filt.mode}] ' + (self.filt.note or 'ready')
+        # stream the arm target (short horizon keeps the motion smooth)
+        self.publish(S.ARM_JOINTS, q, self.arm_pub, max(0.1, 2 * self.period))
+        if self.last_grip is None or abs(grip - self.last_grip) > 1e-4:
+            self.publish(S.GRIPPER_JOINTS, [grip, grip], self.grip_pub, max(0.1, 2 * self.period))   # BOTH fingers
+            self.last_grip = grip
+        G.draw_hud(frame, self.mapper)
+        cv2.imshow('SCARA Hand Control', frame)
+        k = cv2.waitKey(1) & 0xFF
+        if k in (27, ord('q')):
+            raise KeyboardInterrupt
+        if k == ord(' '):
+            self.filt.estop = not self.filt.estop
+            self.get_logger().warn('EMERGENCY STOP' if self.filt.estop else 'stop released')
+        if k == ord('m'):
+            self.filt.set_mode(SF.next_mode(self.filt.mode))
+            self.get_logger().info(f'safety mode: {self.filt.mode}')
 
-        ret, frame = self.cap.read()
-        if not ret:
-            return
 
-        frame = cv2.flip(frame, 1)
-        h, w, _ = frame.shape
-        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        results = self.hands.process(rgb_frame)
-
-        selected_joint = "None (No Hand Detected)"
-        direction_str = "HOLD"
-        status_color = (200, 200, 200)
-
-        if results.multi_hand_landmarks:
-            for hand_landmarks in results.multi_hand_landmarks:
-                self.mp_draw.draw_landmarks(frame, hand_landmarks, self.mp_hands.HAND_CONNECTIONS)
-
-                lm = hand_landmarks.landmark
-                extended = count_extended_fingers(lm)
-                total_fingers = sum(extended)
-
-                index_mcp = lm[5]
-                pinky_mcp = lm[17]
-
-                # Hand Tilt / Roll Angle
-                dx = (pinky_mcp.x - index_mcp.x) * w
-                dy = (pinky_mcp.y - index_mcp.y) * h
-                roll_angle = np.arctan2(dy, dx)
-
-                # Determine Direction from Hand Tilt
-                if roll_angle > 0.25:
-                    direction = 1
-                    direction_str = "▶️ RIGHT / UP / CLOSE"
-                    status_color = (0, 255, 0)
-                elif roll_angle < -0.25:
-                    direction = -1
-                    direction_str = "◀️ LEFT / DOWN / OPEN"
-                    status_color = (0, 165, 255)
-                else:
-                    direction = 0
-                    direction_str = "⏹️ HOLD POSITION"
-                    status_color = (255, 255, 0)
-
-                # Step 1: Select Joint by Finger Count & Step 2: Apply Motion Direction
-                if total_fingers == 1:
-                    selected_joint = "1. Base Column (column_joint)"
-                    self.curr_column += direction * self.SPEED_COLUMN
-                    self.curr_column = float(np.clip(self.curr_column, -2.0, 2.0))
-
-                elif total_fingers == 2:
-                    selected_joint = "2. Z-Axis Elevation (shoulder_joint)"
-                    self.curr_shoulder += direction * self.SPEED_SHOULDER
-                    self.curr_shoulder = float(np.clip(self.curr_shoulder, -0.15, 0.02))
-
-                elif total_fingers == 3:
-                    selected_joint = "3. Forearm Elbow (forearm_joint)"
-                    self.curr_forearm += direction * self.SPEED_FOREARM
-                    self.curr_forearm = float(np.clip(self.curr_forearm, -2.0, 2.0))
-
-                elif total_fingers == 4:
-                    selected_joint = "4. Wrist Rotation (wrist_joint)"
-                    self.curr_wrist += direction * self.SPEED_WRIST
-                    self.curr_wrist = float(np.clip(self.curr_wrist, -4.71, 4.71))
-
-                elif total_fingers == 5:
-                    selected_joint = "5. Gripper (left_finger_joint)"
-                    if direction == 1:
-                        self.curr_gripper = 0.0
-                    elif direction == -1:
-                        self.curr_gripper = -0.05
-
-                # Publish Trajectory to ROS 2 Controller Topics
-                self.publish_targets(self.curr_column, self.curr_shoulder, self.curr_forearm, self.curr_wrist, self.curr_gripper)
-
-                # Visual HUD Panel
-                cv2.rectangle(frame, (10, 10), (w - 10, 190), (30, 30, 30), -1)
-                cv2.putText(frame, "SCARA ROS 2 Finger Select + Tilt Controller", (20, 35),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
-
-                cv2.putText(frame, f"Fingers: {total_fingers} -> Active Joint: {selected_joint}", (20, 65),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-                cv2.putText(frame, f"Hand Tilt: {direction_str}", (20, 95),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.65, status_color, 2)
-
-                cv2.putText(frame, f"Col: {self.curr_column:+.2f}r | Z: {self.curr_shoulder:+.3f}m | Forearm: {self.curr_forearm:+.2f}r | Wrist: {self.curr_wrist:+.2f}r | Grip: {'CLOSED' if self.curr_gripper > -0.02 else 'OPEN'}",
-                            (20, 135), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (200, 200, 200), 1)
-
-        cv2.imshow("SCARA ROS 2 AI Gesture Controller", frame)
-        cv2.waitKey(1)
-
-    def publish_targets(self, col, sh, fore, wr, grip):
-        arm_traj = JointTrajectory()
-        arm_traj.joint_names = ['column_joint', 'shoulder_joint', 'forearm_joint', 'wrist_joint']
-        p_arm = JointTrajectoryPoint()
-        p_arm.positions = [col, sh, fore, wr]
-        p_arm.time_from_start.sec = 0
-        p_arm.time_from_start.nanosec = 100000000
-        arm_traj.points.append(p_arm)
-        self.arm_pub.publish(arm_traj)
-
-        grip_traj = JointTrajectory()
-        grip_traj.joint_names = ['left_finger_joint']
-        p_grip = JointTrajectoryPoint()
-        p_grip.positions = [grip]
-        p_grip.time_from_start.sec = 0
-        p_grip.time_from_start.nanosec = 100000000
-        grip_traj.points.append(p_grip)
-        self.gripper_pub.publish(grip_traj)
-
-def main(args=None):
-    rclpy.init(args=args)
-    node = SCARAGestureControllerROS2()
+def main():
+    rclpy.init()
+    node = GestureNode()
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
@@ -195,6 +156,7 @@ def main(args=None):
         node.destroy_node()
         if rclpy.ok():
             rclpy.shutdown()
+
 
 if __name__ == '__main__':
     main()
