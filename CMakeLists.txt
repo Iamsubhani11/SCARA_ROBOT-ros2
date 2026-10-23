@@ -3,10 +3,15 @@ project(scara_description)
 
 find_package(ament_cmake REQUIRED)
 
+# Source folders are grouped by what they are for (mujoco/, gazebo/, real_robot/, server/, common/);
+# the install keeps the usual ROS layout, so launch files and `ros2 run` work as before.
 install(
-  DIRECTORY urdf meshes launch config worlds gesture_control firmware
+  DIRECTORY urdf meshes launch config gesture_control
   DESTINATION share/${PROJECT_NAME}
 )
+install(DIRECTORY gazebo/worlds DESTINATION share/${PROJECT_NAME})          # -> share/.../worlds
+install(DIRECTORY real_robot/firmware DESTINATION share/${PROJECT_NAME})    # -> share/.../firmware
+install(DIRECTORY mujoco/models DESTINATION share/${PROJECT_NAME}/mujoco)   # -> share/.../mujoco/models
 
 # the control page (browser GUI = the phone app's web page)
 install(
@@ -17,36 +22,36 @@ install(
 # Executables + the Python modules they import (installed side by side)
 install(
   PROGRAMS
-    scripts/scara_scene.py
-    scripts/scara_kinematics.py
-    scripts/scara_models.py
-    scripts/scara_vision.py
-    scripts/scara_sorter_core.py
-    scripts/scara_vision_node.py
-    scripts/scara_color_sorter.py
-    scripts/scara_puck_spawner.py
-    scripts/scara_ask.py
-    scripts/scara_voice.py
-    scripts/scara_feeder.py
-    scripts/scara_twin_protocol.py
-    scripts/scara_twin_bridge.py
-    scripts/scara_twin_server.py
-    scripts/scara_rviz_scene.py
-    scripts/scara_safety.py
-    scripts/scara_mujoco_ros.py
-    scripts/scara_doctor.py
-    scripts/mujoco_twin.py
-    scripts/pick_and_place.py
-    scripts/scara_teleop.py
-    scripts/scara_joy_core.py
-    scripts/scara_joystick.py
-    scripts/launch_mujoco.py
-    scripts/scara_mujoco_teleop.py
-    scripts/scara_mujoco_joystick.py
-    scripts/scara_cam2d.py
-    scripts/scara_camera_setup.py
-    scripts/scara_hw_cell.py
-    scripts/scara_pose_relay.py
+    common/scara_scene.py
+    common/scara_kinematics.py
+    common/scara_models.py
+    common/scara_vision.py
+    common/scara_sorter_core.py
+    gazebo/scara_vision_node.py
+    gazebo/scara_color_sorter.py
+    gazebo/scara_puck_spawner.py
+    gazebo/scara_ask.py
+    common/scara_voice.py
+    common/scara_feeder.py
+    common/scara_twin_protocol.py
+    real_robot/scara_twin_bridge.py
+    server/scara_twin_server.py
+    gazebo/scara_rviz_scene.py
+    common/scara_safety.py
+    mujoco/scara_mujoco_ros.py
+    gazebo/scara_doctor.py
+    mujoco/mujoco_twin.py
+    gazebo/pick_and_place.py
+    gazebo/scara_teleop.py
+    common/scara_joy_core.py
+    gazebo/scara_joystick.py
+    mujoco/launch_mujoco.py
+    mujoco/scara_mujoco_teleop.py
+    mujoco/scara_mujoco_joystick.py
+    real_robot/scara_cam2d.py
+    real_robot/scara_camera_setup.py
+    real_robot/scara_hw_cell.py
+    gazebo/scara_pose_relay.py
     gesture_control/gesture_core.py
     gesture_control/gesture_control_mujoco.py
     gesture_control/gesture_control_ros2.py

@@ -4,10 +4,10 @@ Static checks that run without ROS/Gazebo:
   * expands the simple ${...} properties in urdf/arm.xacro
   * checks the URDF tree (one root, every joint's links exist, no duplicates)
   * compares the URDF tool0 position with the MuJoCo 'tcp' site and with
-    scripts/scara_kinematics.py at a few joint configurations
-  * parses worlds/scara_world.sdf and checks the expected models/plugins exist
-  * parses worlds/scara_manual_world.sdf (table + pucks) and checks every puck is reachable
-  * parses worlds/scara_command_world.sdf (conveyor + ONE bin) and checks the bin is reachable
+    common/scara_kinematics.py at a few joint configurations
+  * parses gazebo/worlds/scara_world.sdf and checks the expected models/plugins exist
+  * parses gazebo/worlds/scara_manual_world.sdf (table + pucks) and checks every puck is reachable
+  * parses gazebo/worlds/scara_command_world.sdf (conveyor + ONE bin) and checks the bin is reachable
 
     python3 tools/check_description.py
 """
@@ -18,7 +18,7 @@ import sys
 import xml.etree.ElementTree as ET
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.join(ROOT, 'scripts'))
+sys.path[:0] = [os.path.join(ROOT, d) for d in ('common', 'mujoco', 'gazebo', 'real_robot', 'server', 'gesture_control')]
 import scara_scene as S          # noqa: E402
 import scara_kinematics as K     # noqa: E402
 
@@ -97,7 +97,7 @@ def main():
             fail('URDF tool0 and scara_kinematics disagree')
 
     # world SDF
-    w = ET.parse(os.path.join(ROOT, 'worlds', 'scara_world.sdf')).getroot()
+    w = ET.parse(os.path.join(ROOT, 'gazebo', 'worlds', 'scara_world.sdf')).getroot()
     world = w.find('world')
     names = {m.get('name') for m in world.findall('model')}
     for need in ('table', 'conveyor_frame', 'conveyor_belt', 'fixed_camera', *[f'bin_{c}' for c in S.COLOR_ORDER]):
@@ -108,7 +108,7 @@ def main():
         if need not in plugins:
             fail(f'world is missing plugin {need}')
     print(f'world SDF OK: models {sorted(names)}')
-    mw = ET.parse(os.path.join(ROOT, 'worlds', 'scara_manual_world.sdf')).getroot().find('world')
+    mw = ET.parse(os.path.join(ROOT, 'gazebo', 'worlds', 'scara_manual_world.sdf')).getroot().find('world')
     mnames = {m.get('name') for m in mw.findall('model')}
     want = {n for n, _ in S.MANUAL_PUCKS} | {'table', 'ground_plane'}
     if mnames != want:
@@ -119,7 +119,7 @@ def main():
         except K.IKError as e:
             fail(f'manual world: {name} cannot be grabbed: {e}')
     print(f'manual world SDF OK: {sorted(mnames)} - every puck reachable with the gripper around it')
-    cw = ET.parse(os.path.join(ROOT, 'worlds', 'scara_command_world.sdf')).getroot().find('world')
+    cw = ET.parse(os.path.join(ROOT, 'gazebo', 'worlds', 'scara_command_world.sdf')).getroot().find('world')
     cnames = {m.get('name') for m in cw.findall('model')}
     for need in ('table', 'conveyor_frame', 'conveyor_belt', 'fixed_camera', 'drop_bin'):
         if need not in cnames:

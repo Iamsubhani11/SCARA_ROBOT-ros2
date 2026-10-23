@@ -20,16 +20,19 @@ you were trying to move it; and the gripper sign was reversed.
 Pure NumPy - landmarks come in as (21, 3) arrays in image-normalised units
 (x right, y down) from a MIRRORED (selfie) camera frame.
 """
+import os as _os, sys as _sys  # noqa: E401 - the other folders of this package (common/, mujoco/ ...)
+_sys.path[:0] = [_os.path.join(_os.path.dirname(_os.path.abspath(__file__)), '..', _d)
+                 for _d in ('common', 'mujoco', 'gazebo', 'real_robot', 'server', 'gesture_control')]
 import math
 
 import numpy as np
 
 try:
     import scara_scene as S
-except ImportError:   # gesture_control/ is next to scripts/
+except ImportError:   # gesture_control/ is next to common/
     import os
     import sys
-    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'scripts'))
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'common'))
     import scara_scene as S
 
 WRIST, THUMB_TIP, INDEX_MCP, INDEX_TIP, MIDDLE_MCP, PINKY_MCP = 0, 4, 5, 8, 9, 17

@@ -2,7 +2,7 @@
 """
 Make the raised name plate that sits on top of the SCARA shoulder link.
 
-    python3 tools/make_name_mesh.py                       # SUBHANI, default size
+    python3 tools/make_name_mesh.py --text "YOUR NAME"    # default size
     python3 tools/make_name_mesh.py --text "MY NAME" --cap 18 --depth 1.5
 
 The raised letters are merged INTO meshes/shoulder_link.stl, so the name is part of
@@ -272,7 +272,7 @@ def write_stl(path, tris, header=b'SCARA shoulder name plate'):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument('--text', default='SUBHANI')
+    ap.add_argument('--text', default=None, help='the name to put on the arm, e.g. --text "YOUR NAME"')
     ap.add_argument('--font', default=None, help='TTF/OTF file (default: Inter Display Bold or DejaVu Sans Bold)')
     ap.add_argument('--cap', type=float, default=19.0, help='letter height in mm (default 19)')
     ap.add_argument('--depth', type=float, default=1.6, help='how far the letters stand out, mm (default 1.6)')
@@ -289,6 +289,8 @@ def main():
             os.remove(paint)
         print('name removed: plain meshes/shoulder_link.stl, no shoulder_name.stl')
         return
+    if not a.text:
+        raise SystemExit('give the name: python3 tools/make_name_mesh.py --text "YOUR NAME"  (or --remove)')
     font = a.font or next((f for f in FONTS if os.path.exists(f)), None)
     if not font:
         raise SystemExit('no font found - pass --font /path/to/font.ttf')
@@ -299,7 +301,7 @@ def main():
                          % (size[0], size[1], flat_len, 2 * FACE_HALF_WIDTH * 1000))
     # white "paint" on the top of the letters (the colour; the letters themselves are in the arm mesh)
     cap, _ = build(a.text, font, a.cap, a.depth + 0.15, z_from=a.depth - 0.25)
-    write_stl(paint, place(cap, a.reverse))
+    write_stl(paint, place(cap, a.reverse), header=b'name:' + a.text.encode('utf-8')[:70])   # the app shows this name too
     if not a.overlay_only:
         # the raised letters become part of the shoulder mesh itself: deleting shoulder_name.stl
         # only takes the white paint away, the name stays on the arm

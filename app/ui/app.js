@@ -1,4 +1,4 @@
-/* SCARA Digital Twin v2 - phone app.
+/* SCARA Digital Twin 3.1 - phone app and website.
  *
  * Talks to scripts/scara_twin_server.py on the PC (port 9090). That server runs the
  * MuJoCo table / cell, follows a running Gazebo cell, and talks to the real robot
@@ -63,7 +63,12 @@ function toast(text) {
 const fix = (v, d) => { const t = v.toFixed(d); return /^-0(\.0+)?$/.test(t) ? t.slice(1) : t; };   // no "-0.0"
 const deg = (r) => fix(r * 180 / Math.PI, 1) + '°';
 const clamp = (v, a, b) => Math.min(Math.max(v, a), b);
-function limits(j) { return (scene.limits && scene.limits[j]) || [-10, 10]; }
+function limits(j) {
+  // with the real robot in the loop (Real robot / Twin) its own soft limits apply too - the PC sends them
+  const r = app.st && app.link === 'twin' && app.st.robot && app.st.robot.limits;
+  if (r && r[j]) return r[j];
+  return (scene.limits && scene.limits[j]) || [-10, 10];
+}
 
 /* ------------------------------------------------------------------ 3-D view */
 const canvas = $('view');
@@ -95,7 +100,8 @@ const mat = {
   grey: new THREE.MeshStandardMaterial({ color: 0xb3b3b3, metalness: 0.4, roughness: 0.4 }),
   camera: new THREE.MeshStandardMaterial({ color: 0x232327, roughness: 0.6 }),
   name: new THREE.MeshStandardMaterial({ color: 0xf5f5f5, roughness: 0.35 }),
-  ghost: new THREE.MeshBasicMaterial({ color: 0xf2b705, transparent: true, opacity: 0.28, depthWrite: false }),
+  ghost: new THREE.MeshBasicMaterial({ color: 0xf2b705, transparent: true, opacity: 0.28, depthWrite: false,
+    polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 }),   // drawn over the sim arm, no flicker
   wood: new THREE.MeshStandardMaterial({ color: 0xc98a4b, roughness: 0.8 }),
   woodTop: new THREE.MeshStandardMaterial({ color: 0xe6a564, roughness: 0.75 }),
   belt: new THREE.MeshStandardMaterial({ color: 0x3b3e44, roughness: 0.9 }),
@@ -369,18 +375,33 @@ function setView(v) {
 }
 setView('front');
 
+/* arm camera window: full size by default (the maximum), smaller with a pinch or the corner handle */
+const INSET_MIN = 0.45;
+let insetScale = clamp(+store.get('insetScale', 1) || 1, INSET_MIN, 1);
+function insetSize(w) {
+  const iw = Math.round(clamp(w * 0.36, 110, 260) * insetScale);
+  return [iw, Math.round(iw * 3 / 4)];
+}
+function setInsetScale(v, save) {
+  insetScale = clamp(v, INSET_MIN, 1);
+  resize();
+  if (save) store.set('insetScale', +insetScale.toFixed(3));
+}
 function resize() {
   const w = canvas.clientWidth, h = canvas.clientHeight;
   if (!w || !h) return;
   renderer.setSize(w, h, false);
   cam.aspect = w / h;
   cam.updateProjectionMatrix();
-  const iw = Math.round(clamp(w * 0.36, 110, 260)), ih = Math.round(iw * 3 / 4);
+  const [iw, ih] = insetSize(w);
   const f = $('insetFrame');
   f.style.width = iw + 'px'; f.style.height = ih + 'px';
   f.hidden = !showInset;
+  const cs = getComputedStyle(f);                // the picture goes exactly where the CSS puts its frame
+  insetOff = { top: parseFloat(cs.top) || 8, right: parseFloat(cs.right) || 8 };
   document.documentElement.style.setProperty('--inset-w', showInset ? iw + 'px' : '0px');
 }
+let insetOff = { top: 8, right: 8 };
 new ResizeObserver(resize).observe(canvas);
 
 function render() {
@@ -393,8 +414,8 @@ function render() {
     world.updateMatrixWorld();
     armCam.matrixWorld.copy(camMount.matrixWorld);
     armCam.matrixWorldInverse.copy(armCam.matrixWorld).invert();
-    const iw = Math.round(clamp(w * 0.36, 110, 260)), ih = Math.round(iw * 3 / 4);
-    const x = w - iw - 8, y = h - ih - 8;          // gl: origin bottom-left -> top-right corner
+    const [iw, ih] = insetSize(w);
+    const x = w - iw - insetOff.right, y = h - ih - insetOff.top;   // gl: origin bottom-left -> top-right corner
     renderer.setScissorTest(true);
     renderer.setScissor(x, y, iw, ih);
     renderer.setViewport(x, y, iw, ih);
@@ -427,7 +448,7 @@ function connect(ip, port) {
     setLink('off', 'Connect'); toast('That address does not look right'); return;
   }
   ws.onopen = () => {
-    send({ op: 'scara', id: 'hello', cmd: 'hello', args: { device: 'phone app' } });
+    send({ op: 'scara', id: 'hello', cmd: 'hello', args: { device: window.ScaraNative ? 'phone app' : 'website' } });
     helloTimer = setTimeout(startRosbridge, 1500);        // no answer: plain rosbridge_server
   };
   ws.onmessage = (ev) => {
@@ -497,7 +518,7 @@ function startRosbridge() {
   for (const [topic, type] of ROS_TOPICS) send({ op: 'advertise', topic, type });
   send({ op: 'subscribe', topic: '/joint_states', type: 'sensor_msgs/JointState', throttle_rate: 100 });
   app.target = null;
-  setLink('rosbridge', 'Connected (ROS)');
+  setLink('rosbridge', 'ROS link');
   $('subtitle').textContent = 'rosbridge - sticks, gripper and colours only';
 }
 function rosTraj(topic, names, pos) {
@@ -676,8 +697,12 @@ function onState(st) {
   if (shown) Object.assign(app.q, shown);
   app.real = realJ;
   const twin = rob.connected && rob.zeroed && simJ && realJ && ctl !== 'sim' && sim.kind !== 'hardware';   // hardware: sim IS the robot
-  ghost.base.visible = !!twin;
-  if (twin) ghost.set(realJ);
+  // the real robot as a yellow see-through arm - only where it is not where the sim is (when they
+  // agree there is nothing to show, and two arms in the same place would just flicker)
+  const apart = twin && ARM.some((j) => Math.abs((realJ[j] || 0) - (simJ[j] || 0)) > (j === 'shoulder_joint' ? 0.002 : 0.015));
+  ghost.base.visible = !!apart;
+  app.twinOn = !!twin;
+  if (apart) ghost.set(realJ);
   const curWorld = sim.world || sim.cell_mode || (sim.kind === 'gazebo' && sim.has_belt ? 'sort' : 'manual');
   if (sim.switching) {
     app.pucks = [];
@@ -696,7 +721,8 @@ function onState(st) {
 
   // header + target switch
   $('simLabel').textContent = { none: 'none running', mujoco: 'MuJoCo', gazebo: 'Gazebo', hardware: 'camera cell (real)' }[sim.kind] || sim.kind || '';
-  $('robotLabel').textContent = rob.connected ? (rob.zeroed ? 'ready' : 'home it first') : 'not connected';
+  $('robotLabel').textContent = rob.connected ? (rob.answering === false ? 'NOT ANSWERING' : rob.zeroed ? 'ready' : 'home it first') : 'not connected';
+  document.querySelector('#target [data-target="robot"]').classList.toggle('alarm', rob.connected && rob.answering === false);
   document.querySelectorAll('#target button').forEach((b) => b.classList.toggle('on', b.dataset.target === ctl));
   $('subtitle').textContent = sim.autonomous ? 'Cell is running by itself' : ({ sim: 'Moving the simulation', robot: 'Moving the real robot', both: 'Digital twin: robot copies the sim' }[ctl] || '');
 
@@ -802,7 +828,12 @@ let lastTick = performance.now(), idleSince = 0;
 
 function currentTarget() {
   if (app.link === 'demo' && app.sim) return app.sim.target;
-  if (app.link === 'twin' && app.st && app.st.targets) return app.st.targets;
+  if (app.link === 'twin' && app.st && app.st.targets) {
+    // the real robot alone and not homed yet: nothing is sent to it, so show where it really is
+    const r = app.st.robot || {};
+    if (app.st.control === 'robot' && r.connected && !r.zeroed && r.joints) return { ...app.st.targets, ...r.joints };
+    return app.st.targets;
+  }
   return app.target || app.q;
 }
 
@@ -1071,6 +1102,10 @@ on('rConnect', () => {
   cmd('connect', { port: $('port').value });
 });
 on('rFake', () => cmd('connect', { fake: true }));
+document.querySelectorAll('#dcheck [data-nudge]').forEach((b) => b.addEventListener('click', () => cmd('dir_nudge', { joint: b.dataset.nudge })));
+document.querySelectorAll('#dcheck [data-flip]').forEach((b) => b.addEventListener('click', () => {
+  if (confirm('Reverse the direction of this joint? Only how its position is read changes - the arm does not move.')) cmd('dir_flip', { joint: b.dataset.flip });
+}));
 $('teachBtns').addEventListener('click', (e) => {
   const b = e.target.closest('button');
   if (b) cmd('cell_teach', { what: b.dataset.what });
@@ -1142,19 +1177,23 @@ function handStatus(t) { $('handText').textContent = t; }
 async function handOn() {
   // Android: the app needs the camera permission first (asked once)
   if (window.ScaraNative && window.ScaraNative.hasCamera && !window.ScaraNative.hasCamera()) {
-    window.onNativePermission = (ok) => { if (ok) handOn(); else toast('Hand control needs the camera - allow it in the app settings'); };
+    window.onNativePermission = (ok) => { if (ok) handOn(); else toast('Gesture control needs the camera - allow it in Android Settings > Apps > SCARA Digital Twin > Permissions'); };
     window.ScaraNative.askCamera();
     return;
   }
   try {
     $('handCam').hidden = false;
     handStatus('Starting the camera…');
-    await window.ScaraHand.start($('handVideo'), $('handView'), handStatus);
+    $('hand').classList.add('on'); $('vHand').classList.add('on');
+    await Promise.race([window.ScaraHand.start($('handVideo'), $('handView'), handStatus),
+      new Promise((_, no) => setTimeout(() => no(new Error('the camera did not start - close other apps that use it and try again')), 12000))]);
     app.hand = true; handFist = null;
-    $('hand').classList.add('on');
+    toast('Gesture control: hold your open hand in the yellow square for 2 s');
     if (app.tilt) $('tilt').click();
   } catch (e) {
+    window.ScaraHand.stop();
     $('handCam').hidden = true;
+    $('hand').classList.remove('on'); $('vHand').classList.remove('on');
     toast(location.protocol === 'http:' && !['localhost', '127.0.0.1'].includes(location.hostname)
       ? 'The browser only allows the camera on http://localhost (or https) - use the PC itself or the Android app'
       : 'Camera not available: ' + (e.message || e.name || e));
@@ -1163,10 +1202,12 @@ async function handOn() {
 function handOff() {
   window.ScaraHand.stop();
   app.hand = false;
-  $('hand').classList.remove('on');
+  $('hand').classList.remove('on'); $('vHand').classList.remove('on');
   $('handCam').hidden = true;
 }
-on('hand', () => (app.hand ? handOff() : handOn()));
+const handToggle = () => (app.hand || $('hand').classList.contains('on') ? handOff() : handOn());
+on('hand', handToggle);
+on('vHand', handToggle);
 on('handCal', () => window.ScaraHand.calibrate());
 window.onNativePause = () => { if (app.hand) handOff(); };
 setInterval(() => {                         // fist closes, open hand opens (only on a change)
@@ -1180,7 +1221,7 @@ setInterval(() => {                         // fist closes, open hand opens (onl
 /* ------------------------------------------------------------------ v3: exact joint sliders */
 const SL_FMT = { shoulder_joint: (v) => `${fix(v * 1000, 0)} mm` };
 let slDrag = null;
-document.querySelectorAll('#sliders input').forEach((el) => {
+document.querySelectorAll('.sliders input[data-j]').forEach((el) => {
   const j = el.dataset.j;
   el.addEventListener('pointerdown', () => { slDrag = j; });
   el.addEventListener('input', () => {
@@ -1194,7 +1235,7 @@ document.querySelectorAll('#sliders input').forEach((el) => {
 });
 function updateSliders() {
   const t = currentTarget();
-  document.querySelectorAll('#sliders input').forEach((el) => {
+  document.querySelectorAll('.sliders input[data-j]').forEach((el) => {
     const j = el.dataset.j, [lo, hi] = limits(j);
     if (+el.min !== lo) { el.min = lo; el.max = hi; }
     if (slDrag === j) return;
@@ -1204,6 +1245,23 @@ function updateSliders() {
   });
 }
 setInterval(updateSliders, 200);
+/* Manual tab: joysticks or sliders (phone); the PC page shows both */
+let mmode = store.get('mmode', 'sticks');
+function setMmode(m) {
+  mmode = m; store.set('mmode', m);
+  document.querySelectorAll('#mmode button').forEach((b) => b.classList.toggle('on', b.dataset.m === m));
+  document.querySelector('.tab[data-tab="manual"]').dataset.mode = m;
+}
+document.querySelectorAll('#mmode button').forEach((b) => b.addEventListener('click', () => setMmode(b.dataset.m)));
+setMmode(mmode);
+const gSl = document.querySelector('#mSliders input[data-g]');
+gSl.addEventListener('input', () => { $('gripFine').value = gSl.value; $('gripFine').dispatchEvent(new Event('input')); });
+setInterval(() => {                          // gripper slider follows the gripper
+  if (document.activeElement === gSl) return;
+  const g = clamp((app.q.left_finger_joint || 0) / (scene.grip_close || -0.025), 0, 1);
+  gSl.value = Math.round(g * 100);
+  gSl.nextElementSibling.textContent = g < 0.08 ? 'open' : `${Math.round(g * 100)} %`;
+}, 200);
 
 /* ------------------------------------------------------------------ v3: keyboard (computer) */
 const keys = new Set();
@@ -1224,6 +1282,7 @@ document.addEventListener('keydown', (e) => {
   else if (k === 'h') cmd('home');
   else if (k === 'p') cmd('teach_add');
   else if (k === 'v') voice();
+  else if (k === 't') toggleTheme();
 });
 document.addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
 window.addEventListener('blur', () => keys.clear());
@@ -1435,6 +1494,196 @@ document.querySelectorAll('#tabs button').forEach((b) => b.addEventListener('cli
 }, 0)));
 setTimeout(() => { showKinOverlay(); if ($('fkX').offsetParent && !$('kX').value) useHere(); }, 300);
 
+/* ------------------------------------------------------------------ v3.1: name, start screen, joint bars */
+(function brand() {
+  const b = window.SCARA_BRAND || {};
+  const ver = b.version || '3.1';
+  if (b.name) {
+    document.documentElement.classList.add('named');
+    $('nameplate').textContent = b.name; $('nameplate').hidden = false;
+    $('bootName').textContent = b.name; $('bootName').hidden = false;
+    document.title = `SCARA Digital Twin by ${b.name}`;
+    $('about').innerHTML = `SCARA Digital Twin ${ver} - designed and built by <b>${b.name}</b>. MuJoCo, Gazebo and the real robot in one app.`;
+  } else {
+    $('about').textContent = `SCARA Digital Twin ${ver} - MuJoCo, Gazebo and the real robot in one app.`;
+  }
+})();
+let bootDone = false;
+function hideBoot() {
+  if (bootDone) return;
+  bootDone = true;
+  $('boot').classList.add('gone');
+  setTimeout(() => { $('boot').hidden = true; }, 600);
+}
+setTimeout(hideBoot, 4000);                 // never keep it up, whatever happens
+const readoutBoxes = [...document.querySelectorAll('#readout > div')];
+function updateBars() {
+  ARM.forEach((j, i) => {
+    const [lo, hi] = limits(j), v = app.q[j] || 0;
+    const p = clamp((v - lo) / ((hi - lo) || 1), 0, 1);
+    readoutBoxes[i].style.setProperty('--p', p.toFixed(3));
+    readoutBoxes[i].classList.toggle('near', p < 0.04 || p > 0.96);
+  });
+  const g = clamp((app.q.left_finger_joint || 0) / (scene.grip_close || -0.025), 0, 1);
+  readoutBoxes[4].style.setProperty('--p', g.toFixed(3));
+  if ($('tcp').offsetParent) {
+    const f = fkFull(app.q);
+    $('tcp').innerHTML = `<span>Gripper X<b>${fix(f.xr * 1000, 1)} mm</b></span><span>Y<b>${fix(f.yr * 1000, 1)} mm</b></span>`
+      + `<span>height<b>${fix(f.h * 1000, 0)} mm</b></span><span>yaw<b>${deg(f.yawR)}</b></span>`;
+  }
+}
+setInterval(updateBars, 120);
+function markMore() {                         // fade the bottom of a tab that has more below
+  document.querySelectorAll('.tab').forEach((t) => {
+    t.classList.toggle('more', t.classList.contains('on') && t.scrollHeight - t.scrollTop - t.clientHeight > 6);
+  });
+}
+document.querySelectorAll('.tab').forEach((t) => t.addEventListener('scroll', markMore, { passive: true }));
+setInterval(markMore, 500);
+window.addEventListener('resize', markMore);
+
+/* ------------------------------------------------------------------ v3.1: dark / light, arm camera size */
+const pcMQ = window.matchMedia('(min-width: 1100px) and (min-height: 640px)');
+function applyTheme() {
+  const pref = store.get('theme', 'auto');
+  document.documentElement.dataset.theme = pref === 'auto' ? (pcMQ.matches ? 'dark' : 'light') : pref;
+}
+if (pcMQ.addEventListener) pcMQ.addEventListener('change', applyTheme);
+applyTheme();
+function toggleTheme() {
+  const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+  store.set('theme', next);
+  applyTheme();
+  toast(next === 'dark' ? 'Dark mode' : 'Light mode');
+}
+on('theme', toggleTheme);
+{
+  const fr = $('insetFrame'), grip = $('insetGrip');
+  let pinch = null;
+  const dist = (t) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+  fr.addEventListener('touchstart', (e) => {
+    if (e.touches.length >= 2) { pinch = { d: dist(e.touches) || 1, s: insetScale }; e.preventDefault(); }
+  }, { passive: false });
+  fr.addEventListener('touchmove', (e) => {
+    if (!pinch || e.touches.length < 2) return;
+    e.preventDefault();
+    setInsetScale(pinch.s * dist(e.touches) / pinch.d, false);
+  }, { passive: false });
+  fr.addEventListener('touchend', (e) => {
+    if (pinch && e.touches.length < 2) { pinch = null; store.set('insetScale', +insetScale.toFixed(3)); }
+  });
+  let drag = null;
+  grip.addEventListener('pointerdown', (e) => {
+    e.preventDefault(); e.stopPropagation();
+    grip.setPointerCapture(e.pointerId);
+    drag = { x: e.clientX, y: e.clientY, w: fr.getBoundingClientRect().width, s: insetScale };
+    fr.classList.add('sizing');
+  });
+  grip.addEventListener('pointermove', (e) => {
+    if (!drag) return;
+    // the window hangs from its top-right corner: dragging the handle left / down makes it bigger
+    const grow = Math.max(drag.x - e.clientX, (e.clientY - drag.y) * 4 / 3);
+    setInsetScale(drag.s * (drag.w + grow) / drag.w, false);
+  });
+  const end = () => { if (drag) { drag = null; fr.classList.remove('sizing'); store.set('insetScale', +insetScale.toFixed(3)); } };
+  grip.addEventListener('pointerup', end);
+  grip.addEventListener('pointercancel', end);
+  fr.addEventListener('dblclick', () => setInsetScale(1, true));
+}
+
+/* ------------------------------------------------------------------ v3.1: motion graph, recording, gripper trail */
+const MG = { buf: [], rec: null, t0: performance.now() };
+const MG_COLORS = ['#3d8bfd', '#f2b705', '#2f9e44', '#d63a32'];
+setInterval(() => {                          // 20 Hz samples of where the arm is
+  const t = (performance.now() - MG.t0) / 1000, q = app.q;
+  MG.buf.push([t, ...ARM.map((j) => q[j] || 0)]);
+  while (MG.buf.length && t - MG.buf[0][0] > 10.5) MG.buf.shift();
+  if (MG.rec) {
+    const f = fkFull(q);
+    MG.rec.push([t - MG.rec.t0, ...ARM.map((j) => q[j] || 0), q.left_finger_joint || 0, f.xr, f.yr, f.h, f.yawR]);
+    if (MG.rec.length >= 20 * 300) stopRecording('5 minutes - recording stopped');
+  }
+  if ($('mgraph').offsetParent) drawGraph();
+  trailAdd();
+}, 50);
+function drawGraph() {
+  const cv = $('mgraph'), r = cv.getBoundingClientRect(), dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const W = Math.max(1, Math.round(r.width * dpr)), H = Math.max(1, Math.round(r.height * dpr));
+  if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
+  const g = cv.getContext('2d'), cs = getComputedStyle(document.documentElement);
+  g.clearRect(0, 0, W, H);
+  g.strokeStyle = cs.getPropertyValue('--line2').trim() || '#ccc'; g.lineWidth = 1;
+  for (let k = 0; k <= 4; k++) { const y = Math.round(6 * dpr + (H - 12 * dpr) * k / 4) + 0.5; g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); }
+  if (MG.buf.length < 2) return;
+  const tEnd = MG.buf[MG.buf.length - 1][0];
+  ARM.forEach((j, i) => {
+    const [lo, hi] = limits(j);
+    g.strokeStyle = MG_COLORS[i]; g.lineWidth = 2 * dpr; g.beginPath();
+    MG.buf.forEach((p, k) => {
+      const x = W - (tEnd - p[0]) / 10 * W, v = clamp((p[i + 1] - lo) / ((hi - lo) || 1), 0, 1);
+      const y = 6 * dpr + (1 - v) * (H - 12 * dpr);
+      if (k) g.lineTo(x, y); else g.moveTo(x, y);
+    });
+    g.stroke();
+  });
+}
+function stopRecording(why) {
+  if (!MG.rec) return;
+  MG.last = MG.rec; MG.rec = null;
+  $('mRec').classList.remove('on'); $('mRec').textContent = 'Record';
+  $('mSave').disabled = !MG.last.length;
+  $('mNote').textContent = `${why || 'Recorded'}: ${MG.last.length} samples, ${(MG.last.length / 20).toFixed(1)} s. Save CSV to keep it.`;
+}
+on('mRec', () => {
+  if (MG.rec) { stopRecording(); return; }
+  MG.rec = []; MG.rec.t0 = (performance.now() - MG.t0) / 1000;
+  $('mRec').classList.add('on'); $('mRec').textContent = 'Stop recording';
+  $('mNote').textContent = 'Recording… move the arm (joysticks, sliders, IK, the cell).';
+});
+on('mSave', () => {
+  const rows = MG.last || [];
+  if (!rows.length) return;
+  const head = 'time_s,column_rad,height_m,elbow_rad,wrist_rad,gripper_m,x_robot_m,y_robot_m,pad_height_m,yaw_rad';
+  const csv = head + '\n' + rows.map((r) => r.map((v, k) => (k ? v.toFixed(5) : v.toFixed(3))).join(',')).join('\n') + '\n';
+  const name = `scara_motion_${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.csv`;
+  if (window.ScaraNative) {                  // the Android app: the PC keeps the file
+    if (app.link === 'twin') { cmd('save_recording', { name, csv }); toast('Saved on the PC (see the log for where)'); }
+    else toast('Connect to the PC to save the recording - or record in the website');
+    return;
+  }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+  a.download = name; document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  toast('Saved ' + name);
+});
+// the gripper's path in the 3-D view
+const TRAIL_N = 400;
+const trailGeo = new THREE.BufferGeometry();
+trailGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(TRAIL_N * 3), 3));
+trailGeo.setDrawRange(0, 0);
+const trail = new THREE.Line(trailGeo, new THREE.LineBasicMaterial({ color: 0xf2b705, transparent: true, opacity: 0.9, depthTest: false }));
+trail.renderOrder = 6; trail.frustumCulled = false; trail.visible = false;
+world.add(trail);
+let trailPts = [];
+function trailAdd() {
+  if (!trail.visible) return;
+  const f = fkFull(app.q), z = (scene.table_top || 0.4) + f.h;
+  const last = trailPts[trailPts.length - 1];
+  if (last && Math.hypot(last[0] - f.xw, last[1] - f.yw, last[2] - z) < 0.002) return;
+  trailPts.push([f.xw, f.yw, z]);
+  if (trailPts.length > TRAIL_N) trailPts.shift();
+  const a = trailGeo.attributes.position.array;
+  trailPts.forEach((p, i) => { a[3 * i] = p[0]; a[3 * i + 1] = p[1]; a[3 * i + 2] = p[2]; });
+  trailGeo.attributes.position.needsUpdate = true;
+  trailGeo.setDrawRange(0, trailPts.length);
+}
+$('kTrail').addEventListener('change', () => {
+  trail.visible = $('kTrail').checked; trailPts = []; trailGeo.setDrawRange(0, 0);
+  store.set('trail', trail.visible);
+});
+if (store.get('trail', false)) { $('kTrail').checked = true; trail.visible = true; }
+
 /* ------------------------------------------------------------------ main loop */
 let lastFrame = performance.now(), lastNote = '';
 function frame() {
@@ -1477,21 +1726,24 @@ function frame() {
   $('r2').textContent = deg(r.forearm_joint);
   $('r3').textContent = deg(r.wrist_joint);
   $('r4').textContent = r.left_finger_joint > -0.002 ? 'open' : `${Math.min(100, Math.round(100 * r.left_finger_joint / (scene.grip_close || -0.025)))} %`;
-  const real = ghost.base.visible ? app.real : null;
+  const real = app.twinOn ? app.real : null;
   $('g0').textContent = real ? 'robot ' + deg(real.column_joint || 0) : '';
   $('g1').textContent = real ? `robot ${((real.shoulder_joint || 0) * 1000).toFixed(0)} mm` : '';
   $('g2').textContent = real ? 'robot ' + deg(real.forearm_joint || 0) : '';
   $('g3').textContent = real ? 'robot ' + deg(real.wrist_joint || 0) : '';
   $('g4').textContent = '';
   drawPucks(app.pucks);
+  trailAdd();                                    // the gripper's path: every frame, smooth on any device
   render();
+  if (!bootDone && performance.now() > 600) hideBoot();
   requestAnimationFrame(frame);
 }
 resize();
 refreshEnabled();
 requestAnimationFrame(frame);
 
-window.scaraDebug = { app, cmd, setWorld, setDrive, runSpoken, handOn, handOff, keyVec, fkFull, ikBoth, solveKin, setKinInputs, kinTapAt };
+window.scaraDebug = { app, cmd, setWorld, setDrive, runSpoken, handOn, handOff, keyVec, fkFull, ikBoth, solveKin, setKinInputs, kinTapAt, MG, trailCount: () => trailPts.length,
+  insetOff: () => insetOff, ghostVisible: () => ghost.base.visible };
 const firstRun = !store.get('helpSeen', false);
 if (firstRun) $('helpSheet').hidden = false;          // first start: the short guide, then the connect sheet   // for tools/test_app.py
 

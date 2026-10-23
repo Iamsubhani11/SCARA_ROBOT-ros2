@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Dry run of the REAL-robot camera cell (scripts/scara_hw_cell.py) against the MuJoCo cell,
+Dry run of the REAL-robot camera cell (real_robot/scara_hw_cell.py) against the MuJoCo cell,
 used before going to the hardware:
 
   * the "robot" is a SimLink that behaves like the firmware (speed-limited joints,
@@ -12,7 +12,7 @@ used before going to the hardware:
     python3 tools/test_hw_cell.py command      # red, then any colour (one bin)
     python3 tools/test_hw_cell.py sort         # every colour to its own drop pose
 
-Needs the MuJoCo C harness (MJ_HARNESS, default /home/claude/harness/harness).
+Needs MuJoCo (pip install mujoco): it runs tools/mujoco_harness.py (or the C harness given in MJ_HARNESS).
 """
 import math
 import os
@@ -23,7 +23,7 @@ import cv2
 import numpy as np
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path[:0] = [os.path.join(ROOT, 'scripts'), os.path.join(ROOT, 'tools')]
+sys.path[:0] = [os.path.join(ROOT, d) for d in ('common', 'mujoco', 'gazebo', 'real_robot', 'server', 'gesture_control', 'tools')]
 import scara_scene as S                                      # noqa: E402
 import scara_kinematics as K                                 # noqa: E402
 from scara_cam2d import Camera2D                             # noqa: E402
@@ -31,7 +31,7 @@ from scara_feeder import PuckFeeder                          # noqa: E402
 from scara_hw_cell import HwCell, HardwareIO, CellAborted    # noqa: E402
 from sim_test_sorting import HarnessIO                       # noqa: E402
 
-HARNESS = os.environ.get('MJ_HARNESS', '/home/claude/harness/harness')
+HARNESS = os.environ.get('MJ_HARNESS', os.path.join(ROOT, 'tools', 'mujoco_harness.py'))
 SPEED = {'column_joint': math.radians(90), 'shoulder_joint': 0.04, 'forearm_joint': math.radians(110),
          'wrist_joint': math.radians(300)}
 
@@ -110,7 +110,7 @@ class SimHardwareIO(HardwareIO):
 
 
 def main(mode='command', n_pucks=14, sim_limit=300.0):
-    xml = os.path.join(ROOT, 'urdf', 'scara_command_mujoco.xml' if mode == 'command' else 'scara_scene_mujoco.xml')
+    xml = os.path.join(ROOT, 'mujoco', 'models', 'scara_command_mujoco.xml' if mode == 'command' else 'scara_scene_mujoco.xml')
     io = HarnessIO(HARNESS, xml)
     _, io._pk = io.state()
     io.log = lambda t: print(f'[{io.t:7.2f}s] {t}', flush=True)

@@ -20,7 +20,7 @@ int digitalRead(uint8_t pin) {
     }
   return LOW;
 }
-#include "../../firmware/scara_twin/scara_twin.ino"
+#include "../../real_robot/firmware/scara_twin/scara_twin.ino"
 int main() {
   char buf[256];
   std::deque<std::pair<double, std::string>> script;

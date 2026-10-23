@@ -1,6 +1,61 @@
 # Changes
 
-## 3.0.0 – 22 October 2026 – one app for phone and PC, FK / IK, voice, hand control, hardware twin
+## 3.1.0 – 23 October 2026 – fits every phone, a real PC control room, sliders, twin test
+
+**Fixed**
+* **The app was cut off on most phones.** Everything narrower than 412 px (360 and 393 px are the
+  common sizes) and any phone with large system text was wider than the screen: the header, tabs,
+  readouts and the right joystick were sliced. The layout is now fluid from 320 px, survives 115 %
+  system text (the app caps Android's text scaling there), and short phones get compact joysticks.
+  A tab with more below fades at the bottom. Checked automatically at 320 / 360 / 393 / 430 px.
+* **The browser opened on every start.** `scara_twin_server.py` and `launch_mujoco.py --gui` now
+  only open it with `--open`; otherwise just go to http://localhost:8080.
+* The arm-camera picture was drawn 10 px beside its frame on the PC page.
+* In Twin mode the see-through real robot flickered through the simulated arm when both were in the
+  same place. It now shows only where the robot is not where the simulation is.
+* Colour buttons could overflow on 320 px phones with big text.
+
+**New**
+* **The PC page has its own design**: a dark control room with the tools on a rail, the 3-D cell in a
+  machine-guard window, joints with limit bars (yellow near the end), the gripper position, and
+  dialogs in the middle of the screen. The phone keeps the light pendant.
+* **Sliders in the Manual tab**: one per joint and one for the gripper. Phone: a Joysticks / Sliders
+  switch. PC: both at once.
+* **Gesture** button right under the 3-D view (and in the Manual tab), with a clear message if the
+  camera cannot start.
+* **SUBHANI** in the header as a nameplate (like the letters on the shoulder link), on the start
+  screen, in About and in the browser tab.
+* **Direction check** (Robot tab): nudge each real joint and compare with the 3-D arm; *Opposite*
+  reverses and saves it for every program.
+* **The real robot's own limits apply in Twin / Real robot mode** (sliders, IK, moves), so the
+  simulation never goes where the real arm cannot follow. Before, the firmware stopped the real arm
+  at its limit while the simulation went on.
+* Fixed: `config/twin_hardware.yaml` (joint signs / offsets) was only read by the ROS bridge – the
+  app / website server, the webcam cell and the MuJoCo twin ignored it. All of them read it now.
+* Fixed: the Gazebo vision node crashed without a screen (headless Gazebo, SSH, `--headless`) because
+  it opened OpenCV windows - and without vision nothing was picked. Windows only open with a screen now.
+* The project is arranged by topic: `mujoco/`, `gazebo/`, `real_robot/`, `server/`, `common/`
+  (plus `mujoco/models`, `gazebo/worlds`, `real_robot/firmware`). The installed ROS layout is unchanged.
+* Robot port errors say how to fix them (dialout group, port busy, pyserial missing).
+* Dark and light mode on phone and PC (switch in the header, key T). The arm-camera window can be made
+  smaller: pinch it on the phone, drag its corner with the mouse; double-click for full size again.
+* Fixed: connected to MuJoCo, the app / website showed the arm sorting but **no pucks** in the
+  Sorting and Command cells – the cell never sent their positions. It does now (belt, gripper, bins).
+* **Motion graph** (FK / IK tab): the four joints over the last 10 s, and **Record → Save CSV**
+  (time, joints, gripper position) for the graphs in a report. The website downloads the file; the
+  phone app saves it on the PC (`~/scara_recordings/`).
+* **Gripper path** in the 3-D view (FK / IK tab: show the gripper's path).
+* **Robot watchdog**: a pulled USB cable or a hung Arduino is reported (the Real robot button blinks
+  *NOT ANSWERING*) and nothing more is sent to it; when it answers again the twin carries on.
+* The WebSocket server refuses oversized messages and unpacks big ones quickly.
+* **No old bug comes back**: `docs/FIXED_BUGS.md` lists every bug fixed so far with the test that
+  guards it; `bash tools/run_all_tests.sh` runs them all. New: `tools/test_static.py`,
+  `tools/test_gazebo.py`, `tools/make_hand_video.py`, `tools/mujoco_harness.py` (the MuJoCo tests now
+  run with `pip install mujoco` instead of a separate C program).
+* `tools/test_twin_e2e.py`: the digital twin end to end without hardware – MuJoCo + the software
+  robot: Twin moves, gripper, conveyor relay, STOP, world switches, and the app's IK Go moving both.
+
+## 3.0.0 – 22 October 2026 – one app for phone and PC, FK / IK, voice, gesture control, hardware twin
 
 **Bugs from the app videos**
 * Pucks of the previous world stayed on the screen and overlapped the new ones. The Gazebo
@@ -24,7 +79,7 @@
 * **Voice** in the app: the phone's own recogniser (works offline when the phone has offline
   speech) or Chrome / Edge on a PC. "red then blue", "3 green", "any", "stop picking", "start",
   "stop", "open", "close", "home", "sorting", "command", "table", "emergency stop", "resume".
-* **Hand control** with the front camera, no internet and no model files: move your hand to move
+* **Gesture control** (button *Gesture* under the 3-D view, and in the Manual tab) with the front camera, no internet and no model files: move your hand to move
   the arm, make a fist to close the gripper. The camera preview sits in a corner of the 3-D view,
   away from the buttons.
 * **Exact-position sliders** (Teach tab), **keyboard** in the GUI, an **Activity** log.
@@ -97,6 +152,6 @@
 * Tap-to-move: pick a puck on the table and put it somewhere else (`pick_place` command).
 * Name on the shoulder link: the raised letters are merged into `shoulder_link.stl` itself (deleting a
   file can't remove the name); a thin second mesh paints them white (`tools/make_name_mesh.py`,
-  `--remove` for the plain arm, `tools/blender_name.py`).
+  `--remove` takes them off, `tools/blender_name.py`).
 * README rewritten.
 * The old v1.1 app and its patch file are gone - v2 replaces them.

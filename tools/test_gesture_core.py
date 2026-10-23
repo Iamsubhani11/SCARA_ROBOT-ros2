@@ -8,7 +8,7 @@ import numpy as np
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, 'gesture_control'))
-sys.path.insert(0, os.path.join(ROOT, 'scripts'))
+sys.path[:0] = [os.path.join(ROOT, d) for d in ('common', 'mujoco', 'gazebo', 'real_robot', 'server', 'gesture_control')]
 import gesture_core as G   # noqa: E402
 import scara_scene as S    # noqa: E402
 

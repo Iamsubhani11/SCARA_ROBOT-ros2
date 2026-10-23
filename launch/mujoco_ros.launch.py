@@ -18,7 +18,7 @@ Arguments
 
 Digital twin on MuJoCo + RViz (the real robot is the see-through ghost):
     ros2 launch scara_description mujoco_ros.launch.py mode:=manual twin:=true port:=/dev/ttyACM0 rviz:=true
-    python3 scripts/scara_joystick.py        # drive the sim, the robot follows
+    python3 gazebo/scara_joystick.py        # drive the sim, the robot follows
 """
 import os
 

@@ -1,4 +1,4 @@
-# Digital-twin bridge settings (scripts/scara_twin_bridge.py).
+# Digital-twin bridge settings (real_robot/scara_twin_bridge.py).
 # Match these to YOUR HowToMechatronics SCARA before connecting the motors:
 #   firmware units: j1/j2/j3 in degrees, z in mm (0 = bottom, 170 = top switch)
 #   URDF joint = sign * (firmware value - offset)

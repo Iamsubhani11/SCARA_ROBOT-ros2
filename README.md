@@ -26,7 +26,8 @@ One robot description feeds every simulator, and one twin server connects them t
 * **Digital twin** – the real robot copies the simulation, or the simulation follows the robot;
   with the webcam cell the 3-D view shows the real conveyor and every cube the camera sees.
 * **One app, phone and PC** – Android APK and browser GUI are the same program: joysticks,
-  FK / IK, voice, hand control, teach & replay, an offline simulator that needs no PC.
+  FK / IK, voice, gesture control, joysticks and sliders, dark / light, teach & replay, an offline
+  simulator that needs no PC.
 * **Real hardware** – Arduino firmware (CNC shield, A4988, limit-switch homing), a webcam cell
   that needs no depth camera, and a safety filter in front of every manual move.
 
@@ -34,10 +35,10 @@ One robot description feeds every simulator, and one twin server connects them t
 
 | | |
 |---|---|
-| <img src="docs/media/gui_sorting.png" width="420" alt="The GUI in a browser running the sorting cell"> | **Browser GUI = phone app.** `scara_twin_server.py` serves the app at http://localhost:8080 and connects it by itself. The same page is inside the APK. |
+| <img src="docs/media/gui_sorting.png" width="420" alt="The GUI in a browser running the sorting cell"> | **A control room on the PC, a pendant on the phone.** `scara_twin_server.py` serves the PC page at http://localhost:8080 (it connects by itself); the phone gets the pendant layout of the same program, offline too. |
 | <img src="docs/media/app_ik.gif" width="420" alt="FK / IK tab: a point is typed, the arm goes there"> | **Forward and inverse kinematics, live.** Gripper pose, reach and manipulability as you move; type a point (or tap the table), compare both elbow solutions against the joint limits, press *Go*. |
 | <img src="docs/media/hw_twin.png" width="420" alt="Hardware twin: the red conveyor, the webcam stand and the cubes the camera sees"> | **Hardware twin.** The real cell as it stands on the table: the short red conveyor where you taught the pick point, the webcam on its stand, the drop spots and the cubes the webcam sees. |
-| <img src="docs/media/phone_app.png" width="200" alt="Phone app in command mode"> <img src="docs/media/phone_fk_ik.png" width="200" alt="Phone app, FK / IK tab"> | **Voice and hand control.** Say "red then blue" or "close"; move your hand in front of the camera to drive the arm and make a fist to grip. Works offline on the phone. |
+| <img src="docs/media/phone_app.png" width="200" alt="Phone app in command mode"> <img src="docs/media/phone_fk_ik.png" width="200" alt="Phone app, FK / IK tab"> | **Voice and gesture control.** Say "red then blue" or "close"; move your hand in front of the camera to drive the arm and make a fist to grip. Works offline on the phone. |
 
 | Gazebo / MuJoCo command cell | Manual table | Digital twin in RViz |
 |---|---|---|
@@ -67,8 +68,35 @@ flowchart LR
   C -- USB serial --> R
 ```
 
+## Project layout
+
+Every folder holds one kind of thing, so you can find what you need without reading code:
+
+```
+Scara_robot/
+├── mujoco/            MuJoCo: the programs (launch_mujoco.py, teleop, joystick, twin, ROS bridge)
+│   └── models/        the MuJoCo scenes (sorting cell, command cell, table)
+├── gazebo/            Gazebo + ROS 2 nodes: sorter, vision, puck spawner, teleop, joystick, ask, doctor
+│   └── worlds/        the Gazebo worlds (sorting, command, table)
+├── real_robot/        the real arm: webcam cell, camera setup, ROS twin bridge
+│   └── firmware/      the Arduino sketch (scara_twin.ino)
+├── server/            scara_twin_server.py: the website GUI, the phone app connection and the digital twin
+├── app/               the phone app (APK), its web page app/ui (also the website) and the Android shell
+├── gesture_control/   two-hand webcam gestures for MuJoCo and Gazebo
+├── common/            shared by everything: dimensions, kinematics, safety, sorter, voice, robot protocol
+├── urdf/  meshes/     the robot model (ROS standard places)
+├── launch/  config/   ROS 2 launch files and settings (ROS standard places)
+├── tools/             build scripts and the automated tests
+└── docs/              wiring diagram, pictures for this README
+```
+
+After `colcon build` everything is installed the usual ROS way (`share/scara_description/worlds`,
+`.../mujoco/models`, `.../firmware`, programs in `lib/scara_description`), so the launch files and
+`ros2 run` work the same as before.
+
 ## Contents
 
+0. [Project layout](#project-layout) – which folder holds what
 1. [Get the code](#1-get-the-code) – clone, or unzip the release
 2. [Install](#2-install)
 3. [Quick start – every way to run it](#3-quick-start)
@@ -77,7 +105,7 @@ flowchart LR
 6. [Command mode, sequences and voice](#6-command-mode-sequences-and-voice)
 7. [Manual control and the safety mode](#7-manual-control-and-the-safety-mode)
 8. [The app: browser GUI and phone](#8-the-app-browser-gui-and-phone)
-9. [App features: FK / IK, voice, hand control](#9-app-features-fk--ik-voice-hand-control)
+9. [App features: FK / IK, voice, gesture control](#9-app-features-fk--ik-voice-gesture-control)
 10. [The real robot: wiring, firmware, first start](#10-the-real-robot)
 11. [Real robot, autonomous: the camera cell](#11-real-robot-autonomous-the-camera-cell)
 12. [Digital twin](#12-digital-twin)
@@ -98,26 +126,17 @@ flowchart LR
 git clone https://github.com/Iamsubhani11/SCARA_ROBOT-ros2.git ~/Scara_robot
 ```
 
-**From a release zip.** There are two zips with the same code – only the robot looks different:
-
-| zip | robot |
-|---|---|
-| `scara_robot_plain.zip` | the original meshes, nothing written on the arm |
-| `scara_robot_SUBHANI.zip` | the same, plus **SUBHANI** in raised white letters on top of the shoulder link (Gazebo, MuJoCo, RViz, the phone app) |
+**From the release zip** (`SCARA_ROBOT-ros2.zip`):
 
 ```bash
 cd ~/Downloads
-unzip scara_robot_SUBHANI.zip          # or scara_robot_plain.zip
-mv scara-original-files ~/Scara_robot   # the zip contains one folder, scara-original-files
+unzip SCARA_ROBOT-ros2.zip
+mv SCARA_ROBOT-ros2 ~/Scara_robot     # the zip holds one folder
 cd ~/Scara_robot
 ```
 
-Both zips contain the ready-built phone app in `app/` (plain or named robot to match). The
-reference videos are not part of the code – keep them outside this folder.
-
-To switch a working copy between the two looks later: the name is shown whenever
-`meshes/shoulder_name.stl` exists. Delete it (and run `python3 tools/build_scene.py`) for the plain
-robot, or create it with `python3 tools/make_name_mesh.py` (section 13).
+The ready-built phone app is in `app/`. The reference videos are not part of the code – keep them
+outside this folder.
 
 ---
 
@@ -182,8 +201,9 @@ sudo usermod -aG input $USER       # the Xbox pad (/dev/input/js0)
 # then log out and back in
 ```
 
-Every Python script can be started as `python3 scripts/<name>.py` from `~/Scara_robot`, or as
-`ros2 run scara_description <name>.py`.
+Every program can be started from `~/Scara_robot` with its folder, e.g. `python3 mujoco/launch_mujoco.py`,
+or after `colcon build` as `ros2 run scara_description <name>.py` (the folder does not matter there).
+The folders are explained in [Project layout](#project-layout).
 
 ---
 
@@ -191,20 +211,20 @@ Every Python script can be started as `python3 scripts/<name>.py` from `~/Scara_
 
 | What | Gazebo | MuJoCo |
 |---|---|---|
-| Sorting – every colour into its own bin | `ros2 launch scara_description gazebo.launch.py` | `python3 scripts/launch_mujoco.py --auto --show` |
-| Command mode, type colours | `ros2 launch scara_description gazebo.launch.py mode:=command` and `python3 scripts/scara_ask.py` | `python3 scripts/launch_mujoco.py --command` |
-| Command mode, voice | same, `scara_ask.py --voice` | `python3 scripts/launch_mujoco.py --command --voice --show` |
-| Command mode from GUI / phone | `... mode:=command` and `python3 scripts/scara_twin_server.py --sim gazebo` | `python3 scripts/scara_twin_server.py --world command` (or switch worlds in the app's Auto tab) |
-| Keyboard | `... mode:=manual` and `python3 scripts/scara_teleop.py` | `python3 scripts/scara_mujoco_teleop.py` |
-| Xbox pad | `... mode:=manual` and `python3 scripts/scara_joystick.py` | `python3 scripts/scara_mujoco_joystick.py` |
+| Sorting – every colour into its own bin | `ros2 launch scara_description gazebo.launch.py` | `python3 mujoco/launch_mujoco.py --auto --show` |
+| Command mode, type colours | `ros2 launch scara_description gazebo.launch.py mode:=command` and `python3 gazebo/scara_ask.py` | `python3 mujoco/launch_mujoco.py --command` |
+| Command mode, voice | same, `scara_ask.py --voice` | `python3 mujoco/launch_mujoco.py --command --voice --show` |
+| Command mode from GUI / phone | `... mode:=command` and `python3 server/scara_twin_server.py --sim gazebo` | `python3 server/scara_twin_server.py --world command` (or switch worlds in the app's Auto tab) |
+| Keyboard | `... mode:=manual` and `python3 gazebo/scara_teleop.py` | `python3 mujoco/scara_mujoco_teleop.py` |
+| Xbox pad | `... mode:=manual` and `python3 gazebo/scara_joystick.py` | `python3 mujoco/scara_mujoco_joystick.py` |
 | Hand gestures | `... mode:=manual` and `python3 gesture_control/gesture_control_ros2.py` | `python3 gesture_control/gesture_control_mujoco.py` |
-| Browser GUI / phone app | `... mode:=manual` and `python3 scripts/scara_twin_server.py --sim gazebo` | `python3 scripts/launch_mujoco.py --gui` |
+| Browser GUI / phone app | `... mode:=manual` and `python3 server/scara_twin_server.py --sim gazebo` | `python3 mujoco/launch_mujoco.py --gui` |
 | Real robot in the GUI / app | add `--port /dev/ttyACM0` to `scara_twin_server.py` | same |
-| Real robot sorting by itself (webcam) | – | `python3 scripts/scara_hw_cell.py --port /dev/ttyACM0` (section 11) |
+| Real robot sorting by itself (webcam) | – | `python3 real_robot/scara_hw_cell.py --port /dev/ttyACM0` (section 11) |
 | RViz with robot and cell | `... gazebo.launch.py rviz:=true` | `ros2 launch scara_description mujoco_ros.launch.py rviz:=true` |
 | Digital twin in RViz | `ros2 launch scara_description digital_twin.launch.py port:=/dev/ttyACM0` | `ros2 launch scara_description mujoco_ros.launch.py mode:=manual twin:=true port:=/dev/ttyACM0 rviz:=true` |
 | Gazebo without a window | `... gazebo.launch.py headless:=true` | – |
-| What is wrong with my running cell? | `python3 scripts/scara_doctor.py` | same, with `mujoco_ros.launch.py` |
+| What is wrong with my running cell? | `python3 gazebo/scara_doctor.py` | same, with `mujoco_ros.launch.py` |
 
 Only one program should move the arm at a time. That is why the keyboard, pad, gestures and GUI
 use `mode:=manual` in Gazebo – no sorter runs there. No hardware yet? `--fake` (GUI) or
@@ -251,7 +271,7 @@ ros2 topic pub --once /scara/spawn_puck std_msgs/msg/String "{data: 'green'}"   
 ros2 topic echo /scara/status                                                    # what the robot is doing
 ```
 
-If something does not move (belt, pucks, arm), run `python3 scripts/scara_doctor.py` in a second
+If something does not move (belt, pucks, arm), run `python3 gazebo/scara_doctor.py` in a second
 terminal. It listens for 15 s and prints PASS/FAIL for the clock, joints, controllers, cameras,
 vision, belt command, pucks and sorter – with the fix for the first thing that fails.
 
@@ -262,12 +282,12 @@ vision, belt command, pucks and sorter – with the fix for the first thing that
 MuJoCo needs no ROS at all and is the quickest way to see everything.
 
 ```bash
-python3 scripts/launch_mujoco.py                      # manual table, move the arm with the viewer's sliders
-python3 scripts/launch_mujoco.py --auto --show        # sorting, with the two camera windows
-python3 scripts/launch_mujoco.py --command            # command mode, type colours in this terminal
-python3 scripts/launch_mujoco.py --command --gui      # command mode with the browser GUI and the phone app
-python3 scripts/launch_mujoco.py --gui                # manual table with the browser GUI and the phone app
-python3 scripts/scara_twin_server.py                  # same, and the GUI / app can switch between
+python3 mujoco/launch_mujoco.py                      # manual table, move the arm with the viewer's sliders
+python3 mujoco/launch_mujoco.py --auto --show        # sorting, with the two camera windows
+python3 mujoco/launch_mujoco.py --command            # command mode, type colours in this terminal
+python3 mujoco/launch_mujoco.py --command --gui      # command mode with the browser GUI and the phone app
+python3 mujoco/launch_mujoco.py --gui                # manual table with the browser GUI and the phone app (add --open to open the browser)
+python3 server/scara_twin_server.py                  # same, and the GUI / app can switch between
                                                       #   table, sorting cell and command cell (--world sort)
 ```
 
@@ -308,9 +328,9 @@ A pick that has already started is always finished first.
 Where you can give commands:
 
 ```bash
-python3 scripts/scara_ask.py              # type (Gazebo or mujoco_ros)
-python3 scripts/scara_ask.py --voice      # talk: "Hey SCARA" ... "red"
-python3 scripts/pick_and_place.py red 2   # ask for two red pucks and wait until both are in the bin
+python3 gazebo/scara_ask.py              # type (Gazebo or mujoco_ros)
+python3 gazebo/scara_ask.py --voice      # talk: "Hey SCARA" ... "red"
+python3 gazebo/pick_and_place.py red 2   # ask for two red pucks and wait until both are in the bin
 ros2 topic pub --once /scara/pick_color std_msgs/msg/String "{data: 'sequence red blue'}"
 ```
 
@@ -331,7 +351,7 @@ gripper, bring it roughly over the puck, lower Z, close, lift.
 ### Safety mode
 
 Everything you do by hand – keyboard, pad, gestures, GUI, phone app, teach & replay – passes
-through `scripts/scara_safety.py` first.
+through `common/scara_safety.py` first.
 
 | | safe (default) | normal | off |
 |---|---|---|---|
@@ -358,8 +378,8 @@ through `scripts/scara_safety.py` first.
 ### Keyboard
 
 ```bash
-python3 scripts/scara_teleop.py          # Gazebo (mode:=manual)
-python3 scripts/scara_mujoco_teleop.py   # MuJoCo
+python3 gazebo/scara_teleop.py          # Gazebo (mode:=manual)
+python3 mujoco/scara_mujoco_teleop.py   # MuJoCo
 ```
 
 `a`/`d` column, `w`/`s` Z, `j`/`l` elbow, `i`/`k` wrist, `o`/`u` close/open (MuJoCo: `g`/`o`),
@@ -368,8 +388,8 @@ python3 scripts/scara_mujoco_teleop.py   # MuJoCo
 ### Xbox pad
 
 ```bash
-python3 scripts/scara_joystick.py          # Gazebo (mode:=manual), reads /dev/input/js0 directly
-python3 scripts/scara_mujoco_joystick.py   # MuJoCo
+python3 gazebo/scara_joystick.py          # Gazebo (mode:=manual), reads /dev/input/js0 directly
+python3 mujoco/scara_mujoco_joystick.py   # MuJoCo
 ```
 
 Left stick: column and Z. Right stick: elbow and wrist. A/B close/open, Y home, hold LB/RB for
@@ -395,24 +415,25 @@ The browser GUI and the Android app are **one program** (`app/ui`). The twin ser
 serves it to the browser, and the APK carries a copy for the phone.
 
 ```bash
-python3 scripts/scara_twin_server.py                          # MuJoCo (switch worlds in the app)
-python3 scripts/scara_twin_server.py --world command          # ... starting in the command cell
-python3 scripts/scara_twin_server.py --sim gazebo --world sort    # starts Gazebo itself, in that world
-python3 scripts/scara_twin_server.py --sim gazebo             # follow a Gazebo you started yourself
-python3 scripts/scara_twin_server.py --port /dev/ttyACM0      # + the real robot
-python3 scripts/scara_twin_server.py --fake                   # + a software robot
-python3 scripts/scara_twin_server.py --sim hardware --port /dev/ttyACM0   # the real webcam cell (section 11)
+python3 server/scara_twin_server.py                          # MuJoCo (switch worlds in the app)
+python3 server/scara_twin_server.py --world command          # ... starting in the command cell
+python3 server/scara_twin_server.py --sim gazebo --world sort    # starts Gazebo itself, in that world
+python3 server/scara_twin_server.py --sim gazebo             # follow a Gazebo you started yourself
+python3 server/scara_twin_server.py --port /dev/ttyACM0      # + the real robot
+python3 server/scara_twin_server.py --fake                   # + a software robot
+python3 server/scara_twin_server.py --sim hardware --port /dev/ttyACM0   # the real webcam cell (section 11)
 ```
 
-The browser opens **http://localhost:8080** and connects by itself (other devices on the Wi-Fi:
+Open **http://localhost:8080** in the browser – the page connects by itself. The browser only opens
+on its own when you ask for it with `--open` (other devices on the Wi-Fi:
 `http://<pc-ip>:8080`). The phone app connects to `ws://<pc-ip>:9090` – the server prints both.
 *Try offline* (or opening `app/ui/index.html` straight from the disk) runs the robot, the table and
 the conveyor cell inside the page, with no PC and no ROS.
 
 <img src="docs/media/app_sorting.gif" width="390" alt="The sorting cell running offline in the app">
 
-**Phone install:** `app/SCARA_Digital_Twin_v3.apk`. Uninstall an older version first (different
-signature). The full guide is in [app/README.md](app/README.md) and behind the **?** button.
+**Phone install:** `app/SCARA_Digital_Twin_v3.apk` (version 3.1). Version 3.0 updates in place; an
+older v1 / v2 app must be uninstalled first (different signature). The full guide is in [app/README.md](app/README.md) and behind the **?** button.
 
 | portrait | landscape |
 |---|---|
@@ -422,14 +443,27 @@ What is where:
 
 | Tab | What you do there |
 |---|---|
-| **Manual** | Two joysticks – joint by joint, or **XY + height** (straight lines over the table); tilt the phone, or **Hand** (camera) to drive; open / close / gripper slider; speed; Safe / Normal / Off; tap a puck and a spot and the robot moves it. |
+| **Manual** | **Joysticks or Sliders** (one slider per joint and the gripper; the PC page shows both) – joint by joint, or **XY + height** (straight lines over the table); tilt the phone, or **Gesture** (camera) to drive; open / close; speed; Safe / Normal / Off; tap a puck and a spot and the robot moves it. |
 | **Auto** | Table / Sorting / Command world, Start / Stop, colour buttons that stay active, sequences, a command box you can type or **speak** into, totals. |
 | **Teach** | Save poses, play once or in a loop; **exact-position sliders** for every joint. |
-| **Robot** | Serial port, connect, home, zero, motors on / free, the camera-cell poses, the **Activity** log. |
+| **Robot** | Serial port, connect, home, zero, motors on / free, the **Direction check** for the first session with the real robot, the camera-cell poses, the **Activity** log. |
 | **FK / IK** | Section 9. |
 
 At the top: the target switch **Simulation / Real robot / Twin**, the microphone, the connection
-pill and a latching **STOP**. Under the 3-D view: Front / Top / Follow and the arm camera.
+pill and a latching **STOP**. Under the 3-D view: Front / Top / Follow, the arm camera and **Gesture**.
+
+| PC, dark (the default on a computer) | PC, light | phone, dark |
+|---|---|---|
+| <img src="docs/media/gui_sorting.png" width="330"> | <img src="docs/media/gui_light.png" width="330"> | <img src="docs/media/phone_dark.png" width="150"> |
+
+**Phone and PC look different on purpose.** The phone is a light teach pendant that fits any phone
+from 320 px wide (and large system text). The PC page is a dark control room: the tools on a rail at
+the left, the 3-D cell in a guard window, and on the right the joints with bars that show how close
+each one is to its limit (yellow near the end), the gripper position, and the open tool. Both have a
+**dark / light** switch (the sun / moon button, key `T`); the phone starts light, the PC dark.
+
+**Arm camera window:** pinch it with two fingers on the phone, or drag its corner with the mouse, to
+make it smaller (it never grows past its normal size); double-click / double-tap for full size.
 
 Keyboard (PC): `A`/`D` column, `W`/`S` Z, `J`/`L` elbow, `I`/`K` wrist, `G`/`O` close / open,
 `H` home, `P` save pose, `V` voice, `Space` STOP / release.
@@ -438,7 +472,7 @@ Nothing moves the real robot before it is zeroed, and nothing moves while its mo
 
 ---
 
-## 9. App features: FK / IK, voice, hand control
+## 9. App features: FK / IK, voice, gesture control
 
 ### Forward and inverse kinematics (FK / IK tab)
 
@@ -476,9 +510,9 @@ Offline speech recognition). In a browser it uses Chrome / Edge speech (online, 
 
 Common mishearings are fixed for you ("read" → red, "blew" → blue, "grin" → green).
 
-### Hand control
+### Gesture (hand) control
 
-*Hand* in the Manual tab uses the front camera (laptop webcam on a PC) – no internet, no model files.
+**Gesture** – the button under the 3-D view (also in the Manual tab) – uses the front camera (laptop webcam on a PC) – no internet, no model files.
 Hold your open palm in the yellow square for two seconds; the app learns your skin colour under your
 light and the size of your open hand. Then:
 
@@ -533,7 +567,7 @@ low as works without skipping steps. If your shield has a jumper from EN to GND 
 ### 10.2 Flash the firmware
 
 1. Arduino IDE → Library Manager → install **AccelStepper** (Mike McCauley). Servo is built in.
-2. Open `firmware/scara_twin/scara_twin.ino`, board **Arduino UNO**, upload.
+2. Open `real_robot/firmware/scara_twin/scara_twin.ino`, board **Arduino UNO**, upload.
 3. Serial Monitor at **115200**, line ending *Newline*. You see `I SCARA twin firmware ready`.
 4. Send `K`. It homes Z, J3, J2, J1 on the switches exactly like the original sketch and parks
    with the arm straight and Z at 100 mm. (The original homes by itself at power-up; here it waits
@@ -567,7 +601,7 @@ A1 is the relay pin, so this mode needs `USE_LIMIT_SWITCHES 0` and has no convey
 ### 10.3 First start with the PC
 
 ```bash
-python3 scripts/scara_twin_server.py --sim none --port /dev/ttyACM0
+python3 server/scara_twin_server.py --sim none --port /dev/ttyACM0
 ```
 
 In the GUI or the app: *Home on limit switches* (or *Zero here* on a robot without switches),
@@ -575,6 +609,14 @@ then move it with the sliders or the joysticks. If a joint turns the wrong way, 
 (`j1_sign`, …); if the zero is off, set the `*_offset_deg`.
 
 ---
+
+**First session with the real robot – the direction check.** In the app or website: Robot tab →
+connect → *Home switches* → choose **Twin** at the top. Under *Direction check* press **Nudge** for
+each joint: the real arm and the 3-D arm both move a little. If the real one went the other way, press
+**Opposite** – it is saved and every program (app, website, webcam cell, MuJoCo twin, ROS bridge) uses it.
+With the robot connected, the sliders, IK and moves stay inside the robot's own range (column −89°…
+266°, elbow ±150°, wrist ±162°, Z 0…170 mm, as in the firmware) so the simulation never goes where the
+real arm cannot follow.
 
 ## 11. Real robot, autonomous: the camera cell
 
@@ -595,9 +637,9 @@ open → park → belt on.
 ### 11.1 Train the camera (once, and whenever the camera moves)
 
 ```bash
-python3 scripts/scara_camera_setup.py               # camera 0
-python3 scripts/scara_camera_setup.py --source 1    # another camera
-python3 scripts/scara_camera_setup.py --source http://192.168.1.23:8080/video    # phone as IP camera
+python3 real_robot/scara_camera_setup.py               # camera 0
+python3 real_robot/scara_camera_setup.py --source 1    # another camera
+python3 real_robot/scara_camera_setup.py --source http://192.168.1.23:8080/video    # phone as IP camera
 ```
 
 In the window:
@@ -616,7 +658,7 @@ In the window:
 ### 11.2 Teach the robot poses (once)
 
 ```bash
-python3 scripts/scara_hw_cell.py --port /dev/ttyACM0 --teach --home
+python3 real_robot/scara_hw_cell.py --port /dev/ttyACM0 --teach --home
 ```
 
 (`--home` homes on the limit switches first; without switches use `--zero-here` with the arm at the
@@ -641,8 +683,8 @@ in camera-cell mode – jog with the sliders or joysticks and tap the pose's but
 ### 11.3 Run it
 
 ```bash
-python3 scripts/scara_hw_cell.py --port /dev/ttyACM0                    # sorting
-python3 scripts/scara_hw_cell.py --port /dev/ttyACM0 --mode command     # 1-4 / A / N keys pick colours
+python3 real_robot/scara_hw_cell.py --port /dev/ttyACM0                    # sorting
+python3 real_robot/scara_hw_cell.py --port /dev/ttyACM0 --mode command     # 1-4 / A / N keys pick colours
 ```
 
 Camera window keys: `Space` start / pause, `1`–`4` red/green/blue/yellow, `A` any, `N` none, `Q` quit.
@@ -650,7 +692,7 @@ Camera window keys: `Space` start / pause, `1`–`4` red/green/blue/yellow, `A` 
 Or with the browser GUI and the phone app (colour buttons, sequences, pose teaching, STOP):
 
 ```bash
-python3 scripts/scara_twin_server.py --sim hardware --port /dev/ttyACM0 --mode command
+python3 server/scara_twin_server.py --sim hardware --port /dev/ttyACM0 --mode command
 ```
 
 Before it starts, the cell checks that the camera is trained, the poses are taught and the robot
@@ -687,15 +729,15 @@ Ways to connect the simulation and the real robot (all have a fake robot for try
    `ros2 launch scara_description mujoco_ros.launch.py mode:=manual twin:=true port:=/dev/ttyACM0 rviz:=true`
 5. **MuJoCo without ROS**:
    ```bash
-   python3 scripts/launch_mujoco.py --auto --twin /dev/ttyACM0     # the sorter drives the real robot
-   python3 scripts/mujoco_twin.py --port /dev/ttyACM0              # MuJoCo follows the real robot
+   python3 mujoco/launch_mujoco.py --auto --twin /dev/ttyACM0     # the sorter drives the real robot
+   python3 mujoco/mujoco_twin.py --port /dev/ttyACM0              # MuJoCo follows the real robot
    ```
 
 ---
 
 ## 13. The name on the shoulder link
 
-The named zip has **SUBHANI** in raised letters (19 mm tall, standing 1.6 mm out of the surface) on
+The robot has **SUBHANI** in raised letters (19 mm tall, standing 1.6 mm out of the surface) on
 the flat top of the shoulder link, centred on the arm and reading from the column towards the elbow.
 
 The letters are **part of the arm mesh itself**: they are merged into `meshes/shoulder_link.stl`, so
@@ -704,7 +746,7 @@ name with it. A second thin mesh, `meshes/shoulder_name.stl`, only paints the to
 white (same frame and scale as the shoulder link, so it cannot slide out of place). Delete that one
 and the name is still there, raised, in the arm's blue. It shows in Gazebo, RViz, MuJoCo and the app.
 
-(Nothing stops someone from replacing the arm mesh with the plain one, of course - that is true of any
+(Nothing stops someone from replacing the arm mesh with one without letters, of course - that is true of any
 open file. If you want credit to be a condition of reuse, add a licence that requires attribution,
 e.g. CC BY 4.0 for the meshes, and keep your git history as proof of authorship.)
 
@@ -713,7 +755,7 @@ To change the text or size:
 ```bash
 pip install fonttools
 python3 tools/make_name_mesh.py --text "SUBHANI" --cap 19 --depth 1.6   # letters into the arm + white paint
-python3 tools/make_name_mesh.py --remove                                  # back to the plain arm
+python3 tools/make_name_mesh.py --remove                                  # takes the letters off again
 python3 tools/build_scene.py          # MuJoCo models
 python3 tools/build_app.py            # phone app
 colcon build --symlink-install        # Gazebo / RViz pick the new mesh up from the package
@@ -760,21 +802,21 @@ Blender letters into the arm too, import both, join them (Ctrl+J) and export as
 
 ### 14.2 Scripts
 
-| script | options |
+| program | options |
 |---|---|
-| `launch_mujoco.py` | `--auto` · `--command` · `--voice` · `--show` · `--gui` · `--llm` · `--stt` · `--keep-in-bins` · `--capacity N` · `--seed N` · `--twin PORT\|fake` |
-| `scara_twin_server.py` | `--sim mujoco\|gazebo\|hardware\|none` · `--port PORT` · `--fake` · `--mode sort\|command` and `--source CAM` (hardware) · `--http 8080` · `--app-port 9090` · `--no-browser` |
-| `scara_hw_cell.py` | `--port` · `--fake` · `--mode sort\|command` · `--source CAM` · `--teach` · `--zero-here` |
-| `scara_camera_setup.py` | `--source CAM` · `--distance 60` · `--config FILE` |
-| `scara_ask.py` | `--voice` · `--llm` · `--stt` · `--quiet` |
-| `scara_teleop.py`, `scara_mujoco_teleop.py` | `--safety safe\|normal\|off` · `--no-assist` |
-| `scara_joystick.py`, `scara_mujoco_joystick.py` | `--device` · `--layout xbox\|gamecontroller` · `--joy-topic` · `--safety` · `--no-assist` (MuJoCo: `--twin`) |
-| `gesture_control_mujoco.py` | `--camera N` · `--safety` · `--no-assist` |
-| `gesture_control_ros2.py` | ROS params `camera`, `rate`, `safety`, `assist` |
-| `scara_mujoco_ros.py` | `--world sort\|command\|manual` · `--viewer` · `--detections truth\|vision` · `--pucks N` |
-| `mujoco_twin.py` | `--port` · `--fake` · `--drive` · `--homing` |
-| `pick_and_place.py` | `red [N]` |
-| `scara_doctor.py` | – |
+| `mujoco/launch_mujoco.py` | `--auto` · `--command` · `--voice` · `--show` · `--gui` · `--open` · `--llm` · `--stt` · `--keep-in-bins` · `--capacity N` · `--seed N` · `--twin PORT\|fake` |
+| `server/scara_twin_server.py` | `--sim mujoco\|gazebo\|hardware\|none` · `--port PORT` · `--fake` · `--mode sort\|command` and `--source CAM` (hardware) · `--http 8080` · `--app-port 9090` · `--open` (open the browser) |
+| `real_robot/scara_hw_cell.py` | `--port` · `--fake` · `--mode sort\|command` · `--source CAM` · `--teach` · `--zero-here` |
+| `real_robot/scara_camera_setup.py` | `--source CAM` · `--distance 60` · `--config FILE` |
+| `gazebo/scara_ask.py` | `--voice` · `--llm` · `--stt` · `--quiet` |
+| `gazebo/scara_teleop.py`, `mujoco/scara_mujoco_teleop.py` | `--safety safe\|normal\|off` · `--no-assist` |
+| `gazebo/scara_joystick.py`, `mujoco/scara_mujoco_joystick.py` | `--device` · `--layout xbox\|gamecontroller` · `--joy-topic` · `--safety` · `--no-assist` (MuJoCo: `--twin`) |
+| `gesture_control/gesture_control_mujoco.py` | `--camera N` · `--safety` · `--no-assist` |
+| `gesture_control/gesture_control_ros2.py` | ROS params `camera`, `rate`, `safety`, `assist` |
+| `mujoco/scara_mujoco_ros.py` | `--world sort\|command\|manual` · `--viewer` · `--detections truth\|vision` · `--pucks N` |
+| `mujoco/mujoco_twin.py` | `--port` · `--fake` · `--drive` · `--homing` |
+| `gazebo/pick_and_place.py` | `red [N]` |
+| `gazebo/scara_doctor.py` | – |
 | `tools/make_name_mesh.py` | `--text` · `--cap` · `--depth` · `--font` · `--reverse` |
 | `tools/build_app.py` | `--meshes-only` · `--apktool` · `--signer` |
 
@@ -801,49 +843,60 @@ Blender letters into the arm too, import both, join them (Ctrl+J) and export as
 ## 15. How the code fits together
 
 ```
-scripts/scara_scene.py        every dimension: table, belt, pucks, bins, cameras, heights
-   ├─ tools/build_scene.py ─► worlds/*.sdf (Gazebo) and urdf/*_mujoco.xml (MuJoCo)
-   ├─ scara_kinematics.py     IK / FK with the real link lengths
-   ├─ scara_vision.py         colour + depth -> 3-D puck positions (simulation cameras)
-   ├─ scara_cam2d.py          2-D webcam: trained colours + belt ruler (real cell)
-   ├─ scara_sorter_core.py    sorting / command / sequence logic, stop-and-pick
-   │     ├─ scara_color_sorter.py   ROS 2 node (Gazebo, MuJoCo-ROS)
-   │     ├─ launch_mujoco.py        MuJoCo
-   │     └─ scara_hw_cell.py        the real robot with the webcam
-   ├─ scara_safety.py         safety mode for every manual control
-   ├─ scara_voice.py          wake word, speech-to-text, command parsing
-   ├─ scara_twin_protocol.py  serial protocol to the Arduino + fake robot
-   │     ├─ scara_twin_server.py    browser GUI + phone app server
-   │     ├─ scara_twin_bridge.py    ROS 2 twin (RViz ghost)
-   │     └─ mujoco_twin.py          MuJoCo twin without ROS
-   ├─ scara_mujoco_ros.py     MuJoCo with the Gazebo ROS interface
-   └─ scara_rviz_scene.py     the cell in RViz
+common/scara_scene.py        every dimension: table, belt, pucks, bins, cameras, heights
+   ├─ tools/build_scene.py ─► gazebo/worlds/*.sdf (Gazebo) and mujoco/models/*.xml (MuJoCo)
+   ├─ common/scara_kinematics.py     IK / FK with the real link lengths
+   ├─ common/scara_vision.py         colour + depth -> 3-D puck positions (simulation cameras)
+   ├─ real_robot/scara_cam2d.py      2-D webcam: trained colours + belt ruler (real cell)
+   ├─ common/scara_sorter_core.py    sorting / command / sequence logic, stop-and-pick
+   │     ├─ gazebo/scara_color_sorter.py   ROS 2 node (Gazebo, MuJoCo-ROS)
+   │     ├─ mujoco/launch_mujoco.py        MuJoCo
+   │     └─ real_robot/scara_hw_cell.py    the real robot with the webcam
+   ├─ common/scara_safety.py         safety mode for every manual control
+   ├─ common/scara_voice.py          wake word, speech-to-text, command parsing
+   ├─ common/scara_twin_protocol.py  serial protocol to the Arduino + fake robot
+   │     ├─ server/scara_twin_server.py      website GUI + phone app + digital twin
+   │     ├─ real_robot/scara_twin_bridge.py  ROS 2 twin (RViz ghost)
+   │     └─ mujoco/mujoco_twin.py            MuJoCo twin without ROS
+   ├─ mujoco/scara_mujoco_ros.py     MuJoCo with the Gazebo ROS interface
+   └─ gazebo/scara_rviz_scene.py     the cell in RViz
 gesture_control/gesture_core.py   two-hand gestures
-firmware/scara_twin/              Arduino sketch (HowToMechatronics pins and numbers)
-app/ui, app/android               phone app (web UI + WebView shell)
+real_robot/firmware/scara_twin/              Arduino sketch (HowToMechatronics pins and numbers)
+app/ui, app/android               phone app + website (web UI + Android WebView shell)
 ```
 
-To move something in the cell (a bin, the camera, the belt), change `scripts/scara_scene.py` and run
+To move something in the cell (a bin, the camera, the belt), change `common/scara_scene.py` and run
 `python3 tools/build_scene.py && python3 tools/check_description.py`.
 
 ---
 
 ## 16. Testing
 
+**One command runs everything this computer can run** and prints a summary (tests whose tools are
+missing are listed as skipped, with what to install):
+
 ```bash
-python3 scripts/scara_kinematics.py      # IK/FK round trip over the workspace
-python3 scripts/scara_safety.py          # safety filter self-test
-python3 scripts/scara_twin_protocol.py   # unit conversion + fake robot
-python3 tools/check_description.py       # URDF tree, worlds, reachability
-python3 tools/test_gesture_core.py       # gestures with synthetic hands
-python3 tools/test_firmware_host.py      # compiles the Arduino sketch on the PC (3 variants) and runs it
-python3 tools/test_hw_cell.py command    # real camera cell against MuJoCo (also: sort)
-python3 tools/sim_test_sorting.py        # full sorter in MuJoCo, headless
-python3 tools/test_app.py                # clicks through the phone app in a headless browser (offline mode)
-python3 tools/test_app_v3.py --hand-video hand.y4m   # worlds, voice, sliders, keyboard, hand, FK / IK, layouts
-python3 tools/test_hw_twin.py            # server + app with the webcam cell: belt, cubes, IK Go on the robot
-python3 tools/make_app_media.py          # re-makes the README pictures of the app
+bash tools/run_all_tests.sh            # all (MuJoCo + Gazebo parts take a few minutes)
+bash tools/run_all_tests.sh --quick    # the fast ones, about a minute
 ```
+
+Every bug fixed so far is listed in [docs/FIXED_BUGS.md](docs/FIXED_BUGS.md) with the test that guards
+it – run the tests before every commit and no old bug comes back.
+
+| test | what it checks |
+|---|---|
+| `tools/test_static.py` | the old bugs that need no simulator: browser opening, joint settings, robot limits, WebSocket, camera on the forearm, voice phrases, Android permission, install rules, no undefined names in any program |
+| `tools/check_description.py` | URDF tree, the three worlds, reachability |
+| `common/scara_kinematics.py`, `scara_safety.py`, `scara_twin_protocol.py` | IK/FK round trip, safety filter, robot protocol + software robot |
+| `tools/test_firmware_host.py` | compiles the Arduino sketch on the PC (3 variants) and drives it over its serial protocol |
+| `tools/test_gesture_core.py` | two-hand gestures with synthetic hands |
+| `tools/test_app_v3.py` | the app / website offline: worlds, voice, sliders, keyboard, gesture (with `make_hand_video.py`), FK / IK, recording, every phone width, dark / light, arm-camera resize |
+| `tools/test_hw_twin.py` | the webcam cell as a twin: belt from the taught poses, cubes where they are, IK Go on the robot |
+| `tools/test_twin_e2e.py` | the digital twin: MuJoCo + software robot – Twin moves, robot limits, direction check, STOP, robot not answering, worlds, the app |
+| `tools/sim_test_manual.py`, `sim_test_sorting.py`, `test_hw_cell.py` | MuJoCo physics: manual picks, sorting and command cells, the webcam cell (through `tools/mujoco_harness.py`) |
+| `tools/test_gazebo.py` | Gazebo through the server, headless: picks with the twin, world switches, nothing left over, clean stop |
+
+`python3 tools/make_app_media.py` re-makes the README pictures of the app.
 
 What was run for this release:
 * Gazebo Harmonic (headless, the Jazzy builds of ros_gz and gz_ros2_control) with the real launch
@@ -858,6 +911,9 @@ What was run for this release:
   switching to the command cell and a sequence) and Gazebo (moves through the twin server).
 * The phone app's UI at phone sizes in Chrome against the real twin server, and the APK built,
   signed and checked with apktool.
+* Version 3.1: `tools/run_all_tests.sh` – every test above passed (MuJoCo through the C harness,
+  Gazebo Harmonic headless with the package built and installed by CMake). `tools/mujoco_harness.py`
+  (the same harness on the `mujoco` Python package) could not be run in the build machine.
 * Version 3: switching worlds back and forth (nothing of the old world left), voice commands, the
   sliders, the keyboard, hand control with a recorded hand video as the camera, FK against the
   simulator, IK *Go* offline and on the (software) robot, the hardware twin against a test picture
@@ -867,7 +923,7 @@ What was run for this release:
 
 ## 17. Troubleshooting
 
-**Gazebo: belt / pucks / arm don't move** – run `python3 scripts/scara_doctor.py` and fix the first
+**Gazebo: belt / pucks / arm don't move** – run `python3 gazebo/scara_doctor.py` and fix the first
 FAIL. The usual ones: the gz_ros2_control plugin is not found (section 2.3), Gazebo is paused (press
 ▶), no camera images (GPU driver), an old build (`colcon build` again).
 
@@ -882,14 +938,14 @@ FAIL. The usual ones: the gz_ros2_control plugin is not found (section 2.3), Gaz
   http://localhost:8080 (it connects by itself), or tap the pill and connect.
 * **Voice: "needs internet" / nothing happens** – in a browser speech is online and needs
   localhost or https; on the phone install offline speech (section 9). You can always type.
-* **Hand control: "No hand in the square"** – fill the square with your open palm, plain
+* **Gesture control: "No hand in the square"** – fill the square with your open palm, plain
   background behind it, then *Learn again*. Strongly coloured light confuses it.
 * **Gazebo world switch takes long** – it restarts Gazebo (about 30 s); the overlay says so.
 * **Phone app doesn't connect** – same Wi-Fi, `sudo ufw allow 9090`, and only one of
   `scara_twin_server.py` / `rosbridge_server` running.
 * **`Permission denied: /dev/ttyACM0`** – `sudo usermod -aG dialout $USER`, log out and in.
 * **`W not homed`** – home it with `K` (*Home on limit switches*), or on a robot without switches put the arm at the ready pose and press *Zero here*.
-* **A real joint turns the wrong way** – flip its `*_sign` in `config/twin_hardware.yaml`.
+* **A real joint turns the wrong way** – app / website, Robot tab, **Direction check**: *Nudge* the joint, and if the real arm moved the other way press *Opposite* (saved in `~/.scara_twin_hardware.yaml`, used by every program). Or flip its `*_sign` in `config/twin_hardware.yaml` by hand.
 * **Camera cell: "Cannot start: …"** – it lists what is missing (colours, ruler, poses, zero).
 * **Camera cell picks a little beside the cube** – redo the ruler (`P`, `U`, and `D` for a side
   view) and check the `pick` pose is exactly around a cube at the pick point.

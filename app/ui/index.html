@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <title>SCARA Digital Twin</title>
 <link rel="stylesheet" href="app.css">
+<script>/* dark or light before the first paint: your choice, else dark on a PC, light on a phone */
+(function () { var p = 'auto'; try { p = JSON.parse(localStorage.getItem('scara.theme')) || 'auto'; } catch (e) {}
+  var pc = window.matchMedia && matchMedia('(min-width: 1100px) and (min-height: 640px)').matches;
+  document.documentElement.dataset.theme = p === 'auto' ? (pc ? 'dark' : 'light') : p; })();</script>
 </head>
 <body>
 <div class="app">
@@ -17,8 +21,12 @@
         <rect x="22" y="8" width="5" height="12" rx="2" fill="#1d2730"/>
         <rect x="20" y="20" width="2" height="6" fill="#55616c"/><rect x="27" y="20" width="2" height="6" fill="#55616c"/>
       </svg>
-      <div><h1>SCARA Digital Twin</h1><small id="subtitle">Not connected - tap the status to connect</small></div>
+      <div class="brandtext"><h1>SCARA <span class="long">Digital </span><span class="tw">Twin </span><span class="nameplate" id="nameplate" hidden></span></h1><small id="subtitle">Not connected - tap the status to connect</small></div>
     </div>
+    <button id="theme" class="helpbtn themebtn" aria-label="Dark or light" title="Dark or light (T)">
+      <svg class="sun" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2" fill="currentColor"/><path d="M12 2.5v2.6M12 18.9v2.6M2.5 12h2.6M18.9 12h2.6M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      <svg class="moon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="currentColor"/></svg>
+    </button>
     <button id="help" class="helpbtn" aria-label="How to use the app">?</button>
     <button id="mic" class="helpbtn mic" aria-label="Voice command" title="Voice command (V)"><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" fill="currentColor"/><path d="M6 11a6 6 0 0 0 12 0M12 17v4M8.5 21h7" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></svg></button>
     <button id="conn" class="conn" data-state="off"><span class="dot"></span><span id="connText">Connect</span></button>
@@ -33,13 +41,14 @@
 
   <section class="screen" id="screen">
     <canvas id="view"></canvas>
-    <div class="inset-frame" id="insetFrame"><span>Arm camera</span></div>
+    <div class="inset-frame" id="insetFrame" title="Arm camera - pinch (phone) or drag the corner (mouse) to make it smaller; double-click for full size"><span>Arm camera</span><i class="inset-grip" id="insetGrip" aria-hidden="true"></i></div>
     <div class="ticker" id="ticker"></div>
     <div class="viewtools">
       <button id="vHome">Front</button>
       <button id="vTop">Top</button>
       <button id="vFollow">Follow</button>
       <button id="vCam" class="on">Arm camera</button>
+      <button id="vHand" title="Gesture control: drive the arm with your hand in front of the camera">Gesture</button>
     </div>
     <div class="hint" id="hint" hidden></div>
     <div class="busy" id="busy" hidden></div>
@@ -53,18 +62,29 @@
     <div><span>Elbow</span><b id="r2">0.0°</b><i class="ghost" id="g2"></i></div>
     <div><span>Wrist</span><b id="r3">0.0°</b><i class="ghost" id="g3"></i></div>
     <div><span>Gripper</span><b id="r4">open</b><i class="ghost" id="g4"></i></div>
+    <p class="tcp" id="tcp"></p>
   </section>
 
   <section class="panel">
     <nav class="tabs" id="tabs">
-      <button data-tab="manual" class="on">Manual</button>
-      <button data-tab="cell">Auto</button>
-      <button data-tab="teach">Teach</button>
-      <button data-tab="robot">Robot</button>
-      <button data-tab="kin">FK / IK</button>
+      <button data-tab="manual" class="on"><svg class="ti" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3" fill="currentColor"/></svg><span>Manual</span></button>
+      <button data-tab="cell"><svg class="ti" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="14" width="18" height="5" rx="2.5"/><rect x="8" y="7" width="6" height="6" rx="1"/></svg><span>Auto</span></button>
+      <button data-tab="teach"><svg class="ti" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19V5l7 5 7-5v14"/></svg><span>Teach</span></button>
+      <button data-tab="robot"><svg class="ti" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h10M7 20v-6h4v6M9 14V7l8-2M17 5v5"/></svg><span>Robot</span></button>
+      <button data-tab="kin"><svg class="ti" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20 10 9l6 4 4-8"/><circle cx="10" cy="9" r="1.6" fill="currentColor"/><circle cx="16" cy="13" r="1.6" fill="currentColor"/></svg><span>FK / IK</span></button>
     </nav>
 
     <div class="tab on" data-tab="manual">
+      <div class="seg mmode" id="mmode" aria-label="Drive with">
+        <button data-m="sticks" class="on">Joysticks</button><button data-m="sliders">Sliders</button>
+      </div>
+      <div class="sliders msliders" id="mSliders">
+        <label><span>Column</span><input type="range" data-j="column_joint" step="any" aria-label="Column"><b></b></label>
+        <label><span>Height</span><input type="range" data-j="shoulder_joint" step="any" aria-label="Height"><b></b></label>
+        <label><span>Elbow</span><input type="range" data-j="forearm_joint" step="any" aria-label="Elbow"><b></b></label>
+        <label><span>Wrist</span><input type="range" data-j="wrist_joint" step="any" aria-label="Wrist"><b></b></label>
+        <label><span>Gripper</span><input type="range" data-g="1" min="0" max="100" step="1" value="0" aria-label="Gripper closed"><b>open</b></label>
+      </div>
       <div class="sticks">
         <div class="stick"><div class="pad" id="stickL"><div class="knob"></div></div><div class="cap">Column ↔ &nbsp; Height ↕</div></div>
         <div class="mid">
@@ -79,7 +99,7 @@
           <button data-d="joints">Joints</button><button data-d="xy">XY + height</button>
         </div>
         <button id="tilt" style="flex:0 0 auto">Tilt</button>
-        <button id="hand" style="flex:0 0 auto" title="Drive with your hand in front of the camera">Hand</button>
+        <button id="hand" style="flex:0 0 auto" title="Drive with your hand in front of the camera">Gesture</button>
       </div>
       <div class="row">
         <span class="label" style="min-width:52px">Speed</span>
@@ -184,6 +204,15 @@
       </div>
       <div class="ksol" id="kSol"></div>
       <label class="check"><input type="checkbox" id="kReach" checked> Show the reachable area on the table</label>
+      <label class="check"><input type="checkbox" id="kTrail"> Show the gripper's path (last 20 s)</label>
+      <h3 class="sub">Motion graph: the joints over the last 10 s</h3>
+      <canvas class="mgraph" id="mgraph" width="640" height="170" aria-label="Joint positions over time"></canvas>
+      <div class="mlegend"><i style="--c:#3d8bfd">Column</i><i style="--c:#f2b705">Height</i><i style="--c:#2f9e44">Elbow</i><i style="--c:#d63a32">Wrist</i><span>% of each joint's range</span></div>
+      <div class="row">
+        <button id="mRec">Record</button>
+        <button id="mSave" disabled>Save CSV</button>
+      </div>
+      <p class="note" id="mNote">Record a motion, then save it as a table (time, joints, gripper position) for graphs in your report.</p>
     </div>
 
     <div class="tab" data-tab="robot">
@@ -214,6 +243,15 @@
           <button data-what="drop_yellow">Drop yellow</button>
           <button data-what="drop_any">Drop (one bin)</button>
         </div>
+      </div>
+      <h3 class="sub">Direction check (first time with the real robot)</h3>
+      <p class="note">Home the robot, choose <b>Twin</b>. Press <b>Nudge</b>: the real arm and the 3-D arm move a little.
+      Same way - all good. The other way - press <b>Opposite</b> (saved for next time).</p>
+      <div class="dcheck" id="dcheck">
+        <div class="dcrow"><span>Column</span><button data-nudge="column_joint">Nudge</button><button data-flip="column_joint" title="The real arm moved the other way">Opposite</button></div>
+        <div class="dcrow"><span>Height</span><button data-nudge="shoulder_joint">Nudge</button><button data-flip="shoulder_joint" title="The real arm moved the other way">Opposite</button></div>
+        <div class="dcrow"><span>Elbow</span><button data-nudge="forearm_joint">Nudge</button><button data-flip="forearm_joint" title="The real arm moved the other way">Opposite</button></div>
+        <div class="dcrow"><span>Wrist</span><button data-nudge="wrist_joint">Nudge</button><button data-flip="wrist_joint" title="The real arm moved the other way">Opposite</button></div>
       </div>
       <h3 class="sub">Activity</h3>
       <div class="log" id="log"></div>
@@ -249,6 +287,7 @@
       <p><b>Simulation</b> moves the simulated arm, <b>Real robot</b> the real one, <b>Twin</b> both (the real
       robot copies the simulation). The big red <b>STOP</b> freezes everything; tap it again to release.</p>
       <h3>Manual tab</h3>
+      <p><b>Joysticks / Sliders</b> at the top: sliders set each joint and the gripper exactly.</p>
       <p><b>Joints</b>: left stick = column (left/right) and height (up/down), right stick = elbow and wrist.
       <b>XY + height</b>: left stick moves the gripper over the table in straight lines (up on the stick =
       away from you in the 3-D view), right stick = height (up/down) and wrist turn (left/right).
@@ -269,8 +308,8 @@
       "red", "red then blue", "3 green", "any colour", "stop picking", "start", "stop", "open", "close",
       "home", "sorting", "command mode", "table", "emergency stop", "resume". On the phone it uses the phone's
       own speech recogniser (offline if the phone has offline speech installed); in a browser it needs Chrome.</p>
-      <h3>Hand control</h3>
-      <p>Manual tab, <b>Hand</b>: hold your open palm in the yellow square of the small camera picture for two
+      <h3>Gesture control</h3>
+      <p><b>Gesture</b> (under the 3-D view, or in the Manual tab): hold your open palm in the yellow square of the small camera picture for two
       seconds. Then your hand is the left joystick: keep it in the circle to stand still, move it to move the
       arm. Make a fist to close the gripper, open your hand to open it. Plain background and even light help;
       <b>Learn again</b> if the light changes.</p>
@@ -283,18 +322,32 @@
       <h3>FK / IK tab</h3>
       <p>Live <b>forward kinematics</b>: where the gripper is (X, Y, height, yaw), its reach, the elbow side and how far
       it is from the straight-arm singularity. <b>Inverse kinematics</b>: type a point (or <b>Tap the table</b>), see both
-      elbow solutions with their joint limits, press <b>Go</b>. Robot frame = origin on the column axis.</p>
+      elbow solutions with their joint limits, press <b>Go</b>. Robot frame = origin on the column axis.
+      Below: the <b>motion graph</b> of the last 10 s, <b>Record</b> / <b>Save CSV</b> for your report, and the gripper's path.</p>
       <h3>View</h3>
       <p>Drag to turn, pinch (or mouse wheel) to zoom. Front / Top / Follow (the camera follows the gripper). The small
-      window is the arm camera on the forearm.</p>
+      window is the arm camera on the forearm - pinch it (or drag its corner with the mouse) to make it smaller,
+      double-tap for full size. The sun / moon button switches dark and light (key T).</p>
       <h3>Keyboard (computer)</h3>
       <p>A/D column, W/S height, J/L elbow, I/K wrist, G close, O open, H home, P save pose, V voice,
       Space stop / release.</p>
+      <h3>About</h3>
+      <p id="about">SCARA Digital Twin 3.1 - MuJoCo, Gazebo and the real robot in one app.</p>
     </div>
     <button id="closeHelp" class="primary">Got it</button>
   </div>
 </div>
 <div class="toast" id="toast" hidden></div>
+<div class="boot" id="boot" aria-hidden="true">
+  <svg width="64" height="64" viewBox="0 0 34 34">
+    <rect x="4" y="22" width="12" height="8" rx="2" fill="#0a5cc2"/><rect x="8" y="6" width="4" height="17" fill="#0a5cc2"/>
+    <rect x="8" y="8" width="17" height="5" rx="2.5" fill="#0a5cc2"/><rect x="22" y="8" width="5" height="12" rx="2" fill="#1d2730"/>
+    <rect x="20" y="20" width="2" height="6" fill="#55616c"/><rect x="27" y="20" width="2" height="6" fill="#55616c"/>
+  </svg>
+  <strong>SCARA Digital Twin</strong>
+  <span class="nameplate big" id="bootName" hidden></span>
+  <small id="bootNote">Loading the robot…</small>
+</div>
 
 <script src="lib/three.min.js"></script>
 <script src="lib/OrbitControls.js"></script>
@@ -303,6 +356,7 @@
 <script src="voice.js"></script>
 <script src="hand.js"></script>
 <script src="meshes.js"></script>
+<script src="brand.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

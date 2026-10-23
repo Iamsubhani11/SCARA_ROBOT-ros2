@@ -5,8 +5,8 @@ SCARA cell in Gazebo Harmonic - three modes, like the Mechamind Labs videos.
                                                                      #   every colour into its own bin
     ros2 launch scara_description gazebo.launch.py mode:=command     # COMMAND: endless conveyor, ONE bin;
                                                                      #   the robot picks the colour you ask for
-        python3 scripts/scara_ask.py            # 2nd terminal: type a colour   (red / any / stop / start)
-        python3 scripts/scara_ask.py --voice    # or say "Hey SCARA ... the red one"
+        python3 gazebo/scara_ask.py            # 2nd terminal: type a colour   (red / any / stop / start)
+        python3 gazebo/scara_ask.py --voice    # or say "Hey SCARA ... the red one"
     ros2 launch scara_description gazebo.launch.py mode:=manual      # MANUAL: table + 3 blue / 3 green pucks,
                                                                      #   no conveyor - keyboard / joystick / gestures
 

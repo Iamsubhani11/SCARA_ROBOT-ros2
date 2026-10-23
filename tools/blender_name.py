@@ -1,7 +1,7 @@
 """
 Blender version of tools/make_name_mesh.py - edit the name on the shoulder link in Blender.
 
-    blender --background --python tools/blender_name.py -- --text SUBHANI
+    blender --background --python tools/blender_name.py -- --text "YOUR NAME"
     (or open Blender > Scripting > Open this file > Run Script, after editing TEXT below)
 
 It imports meshes/shoulder_link.stl, adds a Text object on the flat top face of the
@@ -19,7 +19,7 @@ import sys
 
 import bpy
 
-TEXT = 'SUBHANI'
+TEXT = 'YOUR NAME'                 # or pass --text
 CAP_MM = 19.0           # letter height
 DEPTH_MM = 1.6          # how far the letters stand out of the face
 SINK_MM = 0.5           # how far they go into the face (no gap)

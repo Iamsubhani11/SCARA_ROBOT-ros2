@@ -92,6 +92,10 @@ async def main(out):
         ims = await frames(pg, clip, 6, 120, 0.62, before=(4, go.click))
         save_gif(ims, os.path.join(out, 'app_ik.gif'), 120)
         await pg.screenshot(path=os.path.join(out, 'gui_fk_ik.png'))
+        await pg.click('#theme')                       # the PC page in light mode too
+        await pg.wait_for_timeout(3700)                # (after the "Light mode" message has gone)
+        await pg.screenshot(path=os.path.join(out, 'gui_light.png'))
+        await pg.click('#theme')
         await b.close()
         # 3. phone, portrait: command mode + voice / hand buttons
         b, pg = await start(p, 412, 915, 2)
@@ -104,6 +108,11 @@ async def main(out):
         await pg.click('#tabs [data-tab=kin]')
         await pg.wait_for_timeout(600)
         await pg.screenshot(path=os.path.join(out, 'phone_fk_ik.png'))
+        await pg.click('#tabs [data-tab=manual]')
+        await pg.click('#theme')                       # and the phone in dark mode
+        await pg.wait_for_timeout(3700)
+        await pg.screenshot(path=os.path.join(out, 'phone_dark.png'))
+        await pg.click('#theme')
         await b.close()
         # 4. phone, landscape: manual table
         await landscape(p, out)

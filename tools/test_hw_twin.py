@@ -27,7 +27,7 @@ import cv2
 import numpy as np
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.join(ROOT, 'scripts'))
+sys.path[:0] = [os.path.join(ROOT, d) for d in ('common', 'mujoco', 'gazebo', 'real_robot', 'server', 'gesture_control')]
 import scara_scene as S          # noqa: E402
 import scara_kinematics as K     # noqa: E402
 
@@ -124,7 +124,7 @@ def main(a):
     pick, u = setup(home)
     env = dict(os.environ, HOME=home)
     http, app = 8291, 9291
-    proc = subprocess.Popen([sys.executable, os.path.join(ROOT, 'scripts', 'scara_twin_server.py'), '--sim', 'hardware',
+    proc = subprocess.Popen([sys.executable, os.path.join(ROOT, 'server', 'scara_twin_server.py'), '--sim', 'hardware',
                              '--fake', '--no-browser', '--http', str(http), '--app-port', str(app)],
                             env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     try:

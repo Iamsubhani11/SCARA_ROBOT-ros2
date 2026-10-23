@@ -1,11 +1,11 @@
-# SCARA Digital Twin – phone app and browser GUI (v3)
+# SCARA Digital Twin – phone app and browser GUI (v3.1)
 
 `SCARA_Digital_Twin_v3.apk` – same name and package as before (`com.iamsubhani.scaradigitaltwin`),
 rebuilt from scratch. It drives the MuJoCo or Gazebo simulation on your PC, the real robot, or both
 at once (digital twin) – and with **Try offline** the robot, the table and the conveyor cell run on the
 phone itself, no PC needed.
 
-The same page is the PC GUI: `python3 scripts/scara_twin_server.py` serves it at http://localhost:8080
+The same page is the PC GUI: `python3 server/scara_twin_server.py` serves it at http://localhost:8080
 and connects it by itself. New in v3: the **FK / IK** tab, **voice** commands, **hand control** with the
 front camera, exact-position sliders, the keyboard, the activity log, Gazebo world switching, and the
 real webcam cell drawn as it stands on the table (`--sim hardware`).
@@ -20,11 +20,11 @@ your file manager. The first start shows a short guide (the **?** button brings 
 
 1. On the PC start the twin server – it is the app's partner for everything:
    ```bash
-   python3 scripts/scara_twin_server.py                         # MuJoCo (table; switch to the cell from the app)
-   python3 scripts/scara_twin_server.py --world command         # MuJoCo, starting in the command cell
-   python3 scripts/scara_twin_server.py --sim gazebo            # the Gazebo cell you launched (any mode)
-   python3 scripts/scara_twin_server.py --port /dev/ttyACM0     # + the real robot
-   python3 scripts/scara_twin_server.py --sim hardware --port /dev/ttyACM0 --mode command   # real camera cell
+   python3 server/scara_twin_server.py                         # MuJoCo (table; switch to the cell from the app)
+   python3 server/scara_twin_server.py --world command         # MuJoCo, starting in the command cell
+   python3 server/scara_twin_server.py --sim gazebo            # the Gazebo cell you launched (any mode)
+   python3 server/scara_twin_server.py --port /dev/ttyACM0     # + the real robot
+   python3 server/scara_twin_server.py --sim hardware --port /dev/ttyACM0 --mode command   # real camera cell
    ```
    It prints `phone app: ws://192.168.x.x:9090`.
 2. Phone and PC on the same Wi-Fi. Tap the status pill at the top of the app, type the PC address and
@@ -46,6 +46,8 @@ No PC at hand: **Try offline** on the same sheet.
 
 ## Manual tab – drive the arm
 
+* **Joysticks / Sliders**: the switch at the top of the tab. Sliders give one exact slider per joint
+  and one for the gripper (the PC page shows the sliders under the joysticks).
 * **Joints**: left stick = column (←→) and height (↑↓), right stick = elbow (←→) and wrist (↑↓).
 * **XY + height**: the left stick moves the gripper over the table in straight lines – push up and it
   goes away from you *as you see it in the 3-D view* (turn the view and the directions turn with it).
@@ -94,6 +96,11 @@ and both elbow solutions appear with every joint value. A joint past its limit i
 solution cannot be sent; **Go** on the other one moves the arm there. The area the gripper can reach
 (joint limits included) is shaded on the table.
 
+**Motion graph**: the four joints over the last 10 s. **Record**, move the arm, **Stop recording**,
+**Save CSV** – a table of time, joints and gripper position for the graphs in a report (the website
+downloads it; the phone app saves it on the PC in `~/scara_recordings/`). *Show the gripper's path*
+draws where the gripper went in the 3-D view.
+
 ## Voice and hand control
 
 **Voice**: the microphone at the top or *Speak* in the Auto tab. The app uses the phone's speech
@@ -101,7 +108,7 @@ recogniser – offline when offline speech is installed (Google app ▸ Settings
 blue", "3 green", "any", "stop picking", "start", "stop", "open", "close", "home", "sorting", "command",
 "table", "emergency stop", "resume".
 
-**Hand** (Manual tab): allow the camera, hold your open palm in the yellow square for 2 s. Then your
+**Gesture** (button under the 3-D view, or in the Manual tab): allow the camera, hold your open palm in the yellow square for 2 s. Then your
 hand is the left joystick – middle = still, move it to move the arm; a fist closes the gripper, an
 open hand opens it. *Learn again* re-calibrates. Plain background and even light work best.
 
@@ -111,6 +118,9 @@ Serial port → **Connect robot** (or **Software robot** to try it without hardw
 switches** (or **Zero here** on a robot without limit switches). **Motors free / Motors on**. In
 camera-cell mode (`--sim hardware`) the buttons that save the pick, upstream, drop and parking poses
 appear here too, with a tick for every pose already saved.
+
+**Direction check** (first time with the real robot): home it, choose *Twin*, press **Nudge** next to a
+joint – the real and the 3-D arm move a little. Other way round? **Opposite** fixes and saves it.
 
 ## Offline mode, honestly
 

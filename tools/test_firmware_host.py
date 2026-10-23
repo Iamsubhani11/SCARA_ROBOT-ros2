@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Compiles firmware/scara_twin/scara_twin.ino on the PC (g++ with small Arduino /
+Compiles real_robot/firmware/scara_twin/scara_twin.ino on the PC (g++ with small Arduino /
 AccelStepper / Servo mocks in tools/firmware_host_test) and checks the serial
 protocol, in both builds:
 

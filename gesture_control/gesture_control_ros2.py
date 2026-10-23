@@ -15,10 +15,13 @@ Start Gazebo first (no sorter, so they don't fight over the arm):
 Parameters: camera (default 0), rate (publish Hz, default 20),
             safety safe|normal|off (default safe), assist true|false (default true)
 In the camera window: q / Esc quit, SPACE emergency stop on/off, m next safety mode.
-Safety mode (scripts/scara_safety.py): slow joints + gentle gripper, pick assist
+Safety mode (common/scara_safety.py): slow joints + gentle gripper, pick assist
 (the open gripper centres itself over a puck - puck poses from /scara/world_poses),
 a guard against pressing a finger down on a puck, table floor, emergency stop.
 """
+import os as _os, sys as _sys  # noqa: E401 - the other folders of this package (common/, mujoco/ ...)
+_sys.path[:0] = [_os.path.join(_os.path.dirname(_os.path.abspath(__file__)), '..', _d)
+                 for _d in ('common', 'mujoco', 'gazebo', 'real_robot', 'server', 'gesture_control')]
 import os
 import sys
 import time
@@ -35,7 +38,6 @@ from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import gesture_core as G   # noqa: E402
 S = G.S
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'scripts'))
 import scara_safety as SF   # noqa: E402
 
 

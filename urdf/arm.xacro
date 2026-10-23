@@ -16,12 +16,12 @@
     </material>
 
     <!-- ── MOUNT ──────────────────────────────────────────────────────
-         The table, conveyor, bins and cameras now live in worlds/scara_world.sdf.
+         The table, conveyor, bins and cameras now live in gazebo/worlds/scara_world.sdf.
          The conveyor runs across the table in front of the robot (like the
          videos and the SCARA Digital Twin app).
          The robot is bolted to the table top through a fixed joint to "world"
          (it used to carry its own table box, which sat half below the ground
-         and was free to tip over).  Values match scripts/scara_scene.py
+         and was free to tip over).  Values match common/scara_scene.py
          (BASE_XYZ / BASE_YAW): the robot is turned 180 deg so it faces the
          viewer with the conveyor in front of it. -->
     <xacro:property name="mount_x" value="0.20"/>
@@ -222,7 +222,7 @@
          camera_link.stl on a bracket at the front of the forearm, beside the
          wrist, aimed down at the finger pads (70 deg HFOV, 320x240).  It is
          fixed to the forearm, so turning the wrist never swings it into the
-         forearm or the shoulder link.  Same pose as scripts/scara_scene.py
+         forearm or the shoulder link.  Same pose as common/scara_scene.py
          (ARM_CAM_*) and the phone app.  The link frame is the camera frame:
          +X = viewing direction, +Z = image up. -->
     <link name="arm_camera_link">

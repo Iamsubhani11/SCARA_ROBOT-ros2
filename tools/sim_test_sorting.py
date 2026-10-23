@@ -18,7 +18,7 @@ import cv2
 import numpy as np
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.join(ROOT, 'scripts'))
+sys.path[:0] = [os.path.join(ROOT, d) for d in ('common', 'mujoco', 'gazebo', 'real_robot', 'server', 'gesture_control')]
 import scara_scene as S              # noqa: E402
 import scara_vision as V             # noqa: E402
 from scara_sorter_core import Sorter  # noqa: E402
@@ -26,12 +26,16 @@ from scara_feeder import PuckFeeder, classify  # noqa: E402
 from scara_scene import puck_color  # noqa: E402
 
 DT = 0.002
+# the MuJoCo "harness" the tests talk to: tools/mujoco_harness.py (needs: pip install mujoco), or a path
+# to the compiled C version given on the command line / in MJ_HARNESS
+DEFAULT_HARNESS = os.environ.get('MJ_HARNESS', os.path.join(ROOT, 'tools', 'mujoco_harness.py'))
 
 
 class HarnessIO:
     def __init__(self, harness, model, video=None, fps=15, size=(960, 540)):
         env = dict(os.environ, EGL_PLATFORM='surfaceless')
-        self.p = subprocess.Popen([harness, model], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+        exe = [sys.executable, harness] if harness.endswith('.py') else [harness]   # Python (mujoco package) or C harness
+        self.p = subprocess.Popen(exe + [model], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                   text=True, env=env, bufsize=1)
         assert self.p.stdout.readline().startswith('READY')
         self.t = 0.0
@@ -167,7 +171,7 @@ def main():
                          the bin was of a colour active when it was picked, and no puck of an
                          active colour rode off the end of the belt.
     """
-    harness = sys.argv[1]
+    harness = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1] != '-' else DEFAULT_HARNESS
     colors = sys.argv[2] if len(sys.argv) > 2 else 'all'
     video = sys.argv[3] if len(sys.argv) > 3 else None
     mode = os.environ.get('MODE', 'sort')
@@ -179,7 +183,7 @@ def main():
         schedule.append((float(t or 0), cmd.replace('_', ' ')))
     schedule.sort()
     xml = 'scara_command_mujoco.xml' if mode == 'command' else 'scara_scene_mujoco.xml'
-    io = HarnessIO(harness, os.path.join(ROOT, 'urdf', xml), video=video)
+    io = HarnessIO(harness, os.path.join(ROOT, 'mujoco', 'models', xml), video=video)
     _, io._pk = io.state()
     io.feeder = PuckFeeder(io.get_pos, io.set_pos, seed=seed, max_spawn=n_spawn, log=io.log, mode=mode)
     io.sleep(0.5)

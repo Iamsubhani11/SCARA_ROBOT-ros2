@@ -40,6 +40,14 @@
     invoke-virtual {v1, v3}, Landroid/webkit/WebSettings;->setMediaPlaybackRequiresUserGesture(Z)V
     invoke-virtual {v1, v3}, Landroid/webkit/WebSettings;->setSupportZoom(Z)V
 
+    # big system text is kept, but capped at 115 % so the pendant layout still fits the screen
+    invoke-virtual {v1}, Landroid/webkit/WebSettings;->getTextZoom()I
+    move-result v3
+    const/16 v2, 0x73
+    if-le v3, v2, :zoom_ok
+    invoke-virtual {v1, v2}, Landroid/webkit/WebSettings;->setTextZoom(I)V
+    :zoom_ok
+
     # tidy edges: no overscroll glow, the page draws its own background
     const/4 v3, 0x2
     invoke-virtual {v0, v3}, Landroid/view/View;->setOverScrollMode(I)V

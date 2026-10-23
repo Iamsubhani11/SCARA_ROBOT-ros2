@@ -15,7 +15,7 @@ import subprocess
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.join(ROOT, 'scripts'))
+sys.path[:0] = [os.path.join(ROOT, d) for d in ('common', 'mujoco', 'gazebo', 'real_robot', 'server', 'gesture_control')]
 sys.path.insert(0, os.path.join(ROOT, 'tools'))
 import scara_scene as S                       # noqa: E402
 from scara_sorter_core import Sorter          # noqa: E402
@@ -32,9 +32,10 @@ TARGETS = {'puck_blue_2': _arc(-90), 'puck_green_2': _arc(90),
 
 
 def main():
-    harness = sys.argv[1]
+    harness = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1] != '-' else os.environ.get(
+        'MJ_HARNESS', os.path.join(ROOT, 'tools', 'mujoco_harness.py'))
     video = sys.argv[2] if len(sys.argv) > 2 else None
-    io = HarnessIO(harness, os.path.join(ROOT, 'urdf', 'scara_manual_mujoco.xml'), video=video)
+    io = HarnessIO(harness, os.path.join(ROOT, 'mujoco', 'models', 'scara_manual_mujoco.xml'), video=video)
     io.sleep(0.5)
     sorter = Sorter(io, 'all')
     start = dict(S.MANUAL_PUCKS)

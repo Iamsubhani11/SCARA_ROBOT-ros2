@@ -10,11 +10,14 @@ Two-hand gesture control of the SCARA in MuJoCo (same gestures as Gazebo).
 
     python3 gesture_control/gesture_control_mujoco.py [--camera 0] [--safety safe|normal|off]
 
-Safety mode (default "safe", see scripts/scara_safety.py): slow joints and a gentle
+Safety mode (default "safe", see common/scara_safety.py): slow joints and a gentle
 gripper, pick assist (the open gripper centres itself over a puck when you lower it
 close to one), a guard that never lets a finger press down on a puck, a table floor
 and an emergency stop.
 """
+import os as _os, sys as _sys  # noqa: E401 - the other folders of this package (common/, mujoco/ ...)
+_sys.path[:0] = [_os.path.join(_os.path.dirname(_os.path.abspath(__file__)), '..', _d)
+                 for _d in ('common', 'mujoco', 'gazebo', 'real_robot', 'server', 'gesture_control')]
 import argparse
 import os
 import sys
@@ -29,7 +32,6 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import gesture_core as G   # noqa: E402
 S = G.S
-sys.path.insert(0, os.path.join(HERE, '..', 'scripts'))
 import scara_safety as SF   # noqa: E402
 
 
@@ -38,7 +40,7 @@ def main():
     ap.add_argument('--camera', type=int, default=0)
     SF.add_args(ap)
     args = ap.parse_args()
-    model = mujoco.MjModel.from_xml_path(S.pkg_file('urdf', 'scara_manual_mujoco.xml'))   # table + pucks, like the video
+    model = mujoco.MjModel.from_xml_path(S.pkg_file('mujoco', 'models', 'scara_manual_mujoco.xml'))   # table + pucks, like the video
     data = mujoco.MjData(model)
     act = {mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_ACTUATOR, i): i for i in range(model.nu)}
     cap = cv2.VideoCapture(args.camera)
