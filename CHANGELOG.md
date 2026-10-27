@@ -1,5 +1,42 @@
 # Changes
 
+## 3.2.1 – 26 October 2026 – joysticks fixed on phones
+
+**Fixed**
+* **On some phones the joysticks seemed reversed and the arm kept moving by itself** (the wrist kept
+  turning, the height drifted). The phone reported a device that looks like a gamepad; its triggers
+  rest at -1, and 3.2.0 read them as a right stick held over. Now a gamepad does nothing until a person
+  actually uses it (a button press or a real stick push), every axis is measured from where it rests,
+  and an axis that does not rest at 0 (a trigger) is never used as a stick. The on-screen joysticks are
+  exactly as in 3.1.0. Guarded by `tools/test_camera_gamepad.py` (a phantom pad must not move the arm,
+  an Xbox-style pad's triggers must not turn the wrist).
+
+## 3.2.0 – 25 October 2026 – gesture camera window, gamepads, keyboards on the phone
+
+**New**
+* **Gesture camera in its own place**, like the camera window of Gazebo / MuJoCo. It never covers
+  or shrinks the robot view: on a phone it sits above the 3-D view (the page scrolls to the
+  controls), on a tablet or PC at the top of the right-hand column. Drag the bar under the picture
+  to make it taller or shorter. **Window** makes it a floating window (drag the title, resize from
+  the corner), **Small** a corner preview (tap to dock it again), ✕ closes it and stops gesture
+  control. Mode, size and place are remembered. The picture now shows what the tracker sees: the
+  learn square with a countdown, the still zone, the full-speed ring, your hand and open / fist.
+  Double-tap the picture to learn your hand again.
+* **External gamepads** (USB or Bluetooth – Zebronics, Xbox, PlayStation, generic) on the website and
+  in the Android app: sticks and d-pad drive, A close, B open, X home, Y save pose, LB / RB speed,
+  Start STOP, Select belt. Pads without the standard layout (right stick on Z / Rz, hat switch) work
+  too.
+* **Keyboards on the phone** (USB-OTG or Bluetooth) work like on the PC. Arrow keys drive the left
+  stick, + / - change the speed, X switches joints / XY. The keys (and the gamepad's buttons) are
+  shown in the Manual tab as soon as one is used.
+
+**Fixed**
+* WASD did nothing while a slider (speed, gripper) had the focus.
+* The Android app now gives the page the keyboard focus at start, so a plugged-in keyboard works
+  without tapping the page first.
+* Checked automatically: `tools/test_camera_gamepad.py` (every camera mode at phone, tablet and PC
+  sizes, a gamepad driving the arm and the gripper, keyboard keys).
+
 ## 3.1.0 – 23 October 2026 – fits every phone, a real PC control room, sliders, twin test
 
 **Fixed**

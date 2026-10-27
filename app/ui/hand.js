@@ -51,6 +51,14 @@ class HandTracker {
     this.out = { x: 0, y: 0, fist: false, seen: false };
   }
 
+  /* where to draw things in the big camera view (fractions of the mirrored picture) */
+  overlay() {
+    const deadR = 0.18 * 0.32;                              // the still zone: |x| < 0.18 of the 0.32-wide travel
+    return { state: this.state, box: this.box, home: this.home ? { x: this.home.x / W, y: this.home.y / H } : null,
+      deadR, travel: 0.32, blob: this.state === 'tracking' ? this.blob : null, out: this.out,
+      calLeft: this.state === 'calibrating' && this.cal ? Math.max(0, 2.0 - (performance.now() - this.cal.t0) / 1000) : 0 };
+  }
+
   calibrate() {
     this.state = 'calibrating';
     this.cal = { t0: performance.now(), cr: [], cb: [], area: [] };
@@ -74,6 +82,7 @@ class HandTracker {
     }
     const bx0 = Math.round(W / 2 - BOX * H / 2), bx1 = Math.round(W / 2 + BOX * H / 2);
     const by0 = Math.round(H / 2 - BOX * H / 2), by1 = Math.round(H / 2 + BOX * H / 2);
+    this.box = [bx0 / W, by0 / H, bx1 / W, by1 / H];        // for the big camera view (0..1, mirrored image)
     if (this.state === 'calibrating') {
       // the middle of the square is the palm: learn its colour
       for (let y = by0 + 3; y < by1 - 3; y++) for (let x = bx0 + 3; x < bx1 - 3; x++) {
@@ -110,6 +119,7 @@ class HandTracker {
       const d = this.last ? Math.hypot(bl.cx - this.last.x, bl.cy - this.last.y) : 0;
       if (d < bd) { bd = d; best = bl; }
     }
+    this.blob = best ? { x: best.cx / W, y: best.cy / H, r: Math.sqrt(best.area / Math.PI) / W } : null;
     if (!best || bd > W * 0.45) {
       this.out = { x: 0, y: 0, fist: this.out.fist, seen: false };
       if (this.state !== 'lost') this.onStatus('Hand lost - show your hand again');

@@ -41,6 +41,9 @@ a check in one of the tests.
 | 27 | Sliders showed 0° before homing while the robot was elsewhere | showed stale targets | app shows the robot's pose until homed |
 | 28 | Programs still looked for the old `scripts/` folder after the reorganisation | paths | `test_static.py` (no `scripts/`), CMake/launch checks |
 | 29 | **App / website connected to MuJoCo: the arm sorted, but no pucks were drawn** in the Sorting and Command cells (the Table showed them) | the MuJoCo conveyor-cell backend never reported puck positions | `test_twin_e2e.py` (pucks reach the app in Sorting and Command, and the phone app draws them) |
+| 30 | Keyboard keys (WASD) did nothing while a slider had the focus; a keyboard plugged into the phone did nothing until the page was tapped | key handler ignored every input field; the WebView did not take focus | `test_camera_gamepad.py` (keys with the speed slider focused), Android shell requests focus |
+| 31 | Gesture camera covered or shrank the robot view | camera picture drawn inside the 3-D view | `test_camera_gamepad.py` (Docked / Window / Small never cover or shrink the robot view; phone, tablet, PC) |
+| 32 | **Phone app 3.2.0: joysticks seemed reversed, the wrist kept turning and the height drifted by itself** | a device the phone reports as a gamepad has triggers resting at -1; they were read as a right stick held over | `test_camera_gamepad.py` (phantom pad and Xbox-style triggers must not move the arm); a pad now only works after a person uses it |
 
 Lesson from #29: a test must *expect* something, not just print it – the old test printed "0 pucks" and
 still passed. Every check here now fails when the expected thing is missing.

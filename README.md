@@ -432,7 +432,7 @@ the conveyor cell inside the page, with no PC and no ROS.
 
 <img src="docs/media/app_sorting.gif" width="390" alt="The sorting cell running offline in the app">
 
-**Phone install:** `app/SCARA_Digital_Twin_v3.apk` (version 3.1). Version 3.0 updates in place; an
+**Phone install:** `app/SCARA_Digital_Twin_v3.apk` (version 3.2). Versions 3.0 and 3.1 update in place; an
 older v1 / v2 app must be uninstalled first (different signature). The full guide is in [app/README.md](app/README.md) and behind the **?** button.
 
 | portrait | landscape |
@@ -467,6 +467,17 @@ make it smaller (it never grows past its normal size); double-click / double-tap
 
 Keyboard (PC): `A`/`D` column, `W`/`S` Z, `J`/`L` elbow, `I`/`K` wrist, `G`/`O` close / open,
 `H` home, `P` save pose, `V` voice, `Space` STOP / release.
+
+**Gamepad / joystick (phone and website):** any USB or Bluetooth gamepad – Zebronics, Xbox, PlayStation,
+generic – works in the browser and in the Android app (Bluetooth or an OTG cable). Press a button once so it
+is seen. Left / right stick = the two on-screen joysticks (d-pad too); `A` close, `B` open, `X` home,
+`Y` save pose, `LB`/`RB` slower / faster, `Start` STOP / release, `Select` belt on / off.
+
+**Gesture camera:** opens in its own place – above the robot view on a phone, at the top of the right-hand
+column on a tablet or PC – so the 3-D view is never made smaller. Drag the bar under the picture to resize it.
+`Window` turns it into a floating window (drag the title, resize from the corner), `Small` into a corner
+preview, `✕` closes it and stops gesture control. The picture shows the learn square, the still zone,
+your hand and whether it reads open hand or fist.
 
 Nothing moves the real robot before it is zeroed, and nothing moves while its motors are free.
 
@@ -520,7 +531,9 @@ light and the size of your open hand. Then:
   moves that way, faster the further you go;
 * **fist** – close the gripper; **open hand** – open it.
 
-The preview sits in the bottom-right corner of the 3-D view, away from the buttons. *Learn again*
+The camera opens in its own place (above the robot view on a phone, top of the right column on a
+PC; *Window* / *Small* / ✕ in its title bar), and the picture shows what the tracker sees: the learn
+square, the still zone, your hand and open / fist. *Learn again* (or a double-tap on the picture)
 re-calibrates. A plain background and even light work best. (The full two-hand MediaPipe gesture
 control for the PC is in section 7.)
 
@@ -710,7 +723,7 @@ Ways to connect the simulation and the real robot (all have a fake robot for try
    ghost next to the simulated one, and the readouts show both.
 2. **The real webcam cell as a twin** – `scara_twin_server.py --sim hardware --port /dev/ttyACM0`.
    The 3-D view is laid out like the real table: the conveyor goes where you taught the *pick* and
-   *upstream* poses, the webcam stand beside the pick point, a coloured square at every taught drop
+   *upstream* poses, the webcam on its stand with the camera over the middle of the belt (as in the reference build), a coloured square at every taught drop
    pose, and each cube the webcam sees at its real place on the belt (to within about 1 cm). The arm
    is the real arm's joints. Before anything is taught it shows a default layout.
 
@@ -891,6 +904,7 @@ it – run the tests before every commit and no old bug comes back.
 | `tools/test_firmware_host.py` | compiles the Arduino sketch on the PC (3 variants) and drives it over its serial protocol |
 | `tools/test_gesture_core.py` | two-hand gestures with synthetic hands |
 | `tools/test_app_v3.py` | the app / website offline: worlds, voice, sliders, keyboard, gesture (with `make_hand_video.py`), FK / IK, recording, every phone width, dark / light, arm-camera resize |
+| `tools/test_camera_gamepad.py` | gesture camera Docked / Window / Small / closed on phone, tablet and PC (never covers or shrinks the robot view) and a gamepad driving the arm and the gripper |
 | `tools/test_hw_twin.py` | the webcam cell as a twin: belt from the taught poses, cubes where they are, IK Go on the robot |
 | `tools/test_twin_e2e.py` | the digital twin: MuJoCo + software robot – Twin moves, robot limits, direction check, STOP, robot not answering, worlds, the app |
 | `tools/sim_test_manual.py`, `sim_test_sorting.py`, `test_hw_cell.py` | MuJoCo physics: manual picks, sorting and command cells, the webcam cell (through `tools/mujoco_harness.py`) |

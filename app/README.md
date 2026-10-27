@@ -1,4 +1,4 @@
-# SCARA Digital Twin – phone app and browser GUI (v3.1)
+# SCARA Digital Twin – phone app and browser GUI (v3.2)
 
 `SCARA_Digital_Twin_v3.apk` – same name and package as before (`com.iamsubhani.scaradigitaltwin`),
 rebuilt from scratch. It drives the MuJoCo or Gazebo simulation on your PC, the real robot, or both

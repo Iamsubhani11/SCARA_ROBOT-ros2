@@ -40,21 +40,40 @@
   </nav>
 
   <section class="screen" id="screen">
-    <canvas id="view"></canvas>
-    <div class="inset-frame" id="insetFrame" title="Arm camera - pinch (phone) or drag the corner (mouse) to make it smaller; double-click for full size"><span>Arm camera</span><i class="inset-grip" id="insetGrip" aria-hidden="true"></i></div>
-    <div class="ticker" id="ticker"></div>
-    <div class="viewtools">
-      <button id="vHome">Front</button>
-      <button id="vTop">Top</button>
-      <button id="vFollow">Follow</button>
-      <button id="vCam" class="on">Arm camera</button>
-      <button id="vHand" title="Gesture control: drive the arm with your hand in front of the camera">Gesture</button>
+    <div class="pane3d" id="pane3d">
+      <canvas id="view"></canvas>
+      <div class="inset-frame" id="insetFrame" title="Arm camera - pinch (phone) or drag the corner (mouse) to make it smaller; double-click for full size"><span>Arm camera</span><i class="inset-grip" id="insetGrip" aria-hidden="true"></i></div>
+      <div class="ticker" id="ticker"></div>
+      <div class="viewtools">
+        <button id="vHome">Front</button>
+        <button id="vTop">Top</button>
+        <button id="vFollow">Follow</button>
+        <button id="vCam" class="on">Arm camera</button>
+        <button id="vHand" title="Gesture control: drive the arm with your hand in front of the camera">Gesture</button>
+      </div>
+      <div class="hint" id="hint" hidden></div>
+      <div class="busy" id="busy" hidden></div>
     </div>
-    <div class="hint" id="hint" hidden></div>
-    <div class="busy" id="busy" hidden></div>
-    <div class="handcam" id="handCam" hidden><canvas id="handView" width="80" height="60"></canvas><span id="handText">Hand control</span><button id="handCal" type="button">Learn again</button></div>
-    <video id="handVideo" playsinline muted hidden></video>
   </section>
+
+  <div class="campane" id="handCam" hidden>
+    <div class="cambar" id="camBar">
+      <b>Gesture camera</b>
+      <div class="seg cammode" id="camMode" aria-label="Camera view">
+        <button data-cm="dock" data-ic="▤" title="Camera in its own place - the robot view stays full size">Docked</button><button data-cm="float" data-ic="❐" title="A window you can move and resize">Window</button><button data-cm="mini" data-ic="▭" title="Small, in the corner">Small</button>
+      </div>
+      <button id="handCal" type="button" data-ic="↻" title="Learn your hand again (or double-tap the picture)">Learn again</button>
+      <button id="camClose" type="button" class="camx" aria-label="Turn gesture control off" title="Turn gesture control off">&#x2715;</button>
+    </div>
+    <div class="camview" id="camView">
+      <video id="handVideo" playsinline muted></video>
+      <canvas id="handOverlay" aria-hidden="true"></canvas>
+      <canvas id="handView" class="maskview" width="80" height="60" title="What the tracker sees: your hand in blue"></canvas>
+      <div class="camstatus"><span id="handText">Gesture control</span><em id="handGrip"></em></div>
+    </div>
+    <div class="camsize" id="camSplit" role="separator" aria-label="Drag to make the camera bigger or smaller" tabindex="0"><i></i></div>
+    <i class="camgrip" id="camGrip" aria-hidden="true"></i>
+  </div>
 
   <section class="readout" id="readout">
     <div><span>Column</span><b id="r0">0.0°</b><i class="ghost" id="g0"></i></div>
@@ -93,6 +112,19 @@
           <button id="home">Home</button>
         </div>
         <div class="stick"><div class="pad" id="stickR"><div class="knob"></div></div><div class="cap">Elbow ↔ &nbsp; Wrist ↕</div></div>
+      </div>
+      <div class="extin" id="extKeys" hidden>
+        <b>Keyboard</b>
+        <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or arrows = left stick</span>
+        <span><kbd>I</kbd><kbd>J</kbd><kbd>K</kbd><kbd>L</kbd> = right stick</span>
+        <span><kbd>G</kbd> close <kbd>O</kbd> open <kbd>H</kbd> home <kbd>P</kbd> save pose</span>
+        <span><kbd>+</kbd>/<kbd>-</kbd> speed <kbd>X</kbd> joints / XY <kbd>Space</kbd> STOP</span>
+      </div>
+      <div class="extin" id="extPad" hidden>
+        <b id="padName">Gamepad</b>
+        <span>left / right stick = the two joysticks, d-pad too</span>
+        <span>A close · B open · X home · Y save pose</span>
+        <span>LB / RB speed · Start = STOP · Select = belt</span>
       </div>
       <div class="row">
         <div class="seg" id="drive" aria-label="What the sticks move">
@@ -309,10 +341,20 @@
       "home", "sorting", "command mode", "table", "emergency stop", "resume". On the phone it uses the phone's
       own speech recogniser (offline if the phone has offline speech installed); in a browser it needs Chrome.</p>
       <h3>Gesture control</h3>
-      <p><b>Gesture</b> (under the 3-D view, or in the Manual tab): hold your open palm in the yellow square of the small camera picture for two
-      seconds. Then your hand is the left joystick: keep it in the circle to stand still, move it to move the
-      arm. Make a fist to close the gripper, open your hand to open it. Plain background and even light help;
-      <b>Learn again</b> if the light changes.</p>
+      <p><b>Gesture</b> (under the 3-D view, or in the Manual tab) opens the camera in its own place: above the robot
+      on a phone, at the top of the right-hand column on a tablet or PC, so the robot view keeps its full size.
+      Drag the bar under the picture to make it taller or shorter; <b>Window</b> makes it a floating window
+      (drag the title, resize from the corner), <b>Small</b> a corner preview (tap it to dock it again), &#x2715; closes it.
+      Hold your open palm in the yellow square for two seconds. Then your hand is the left joystick: keep it in
+      the inner circle to stand still, move it to move the arm (full speed at the outer circle). Make a fist to close
+      the gripper, open your hand to open it. Plain background and even light help; <b>Learn again</b> (or
+      double-tap the picture) if the light changes.</p>
+      <h3>Gamepad / joystick</h3>
+      <p>Plug a USB gamepad into the PC, or pair a Bluetooth one (or plug it in with an OTG cable) on the phone - Zebronics,
+      Xbox, PlayStation or any other. Press a button once so the browser sees it. Left stick = left joystick,
+      right stick = right joystick (d-pad works too). A / cross close the gripper, B / circle open it,
+      X / square home, Y / triangle save the pose, LB / RB slower / faster, Start = emergency stop (again to
+      release), Select = belt on / off.</p>
       <h3>Teach tab</h3>
       <p>Move the arm, <b>Save this pose</b>, repeat, then <b>Play</b> (or <b>Loop</b>). Go / Delete per pose.
       <b>Exact position</b> sliders put each joint exactly where you want it.</p>
@@ -328,11 +370,13 @@
       <p>Drag to turn, pinch (or mouse wheel) to zoom. Front / Top / Follow (the camera follows the gripper). The small
       window is the arm camera on the forearm - pinch it (or drag its corner with the mouse) to make it smaller,
       double-tap for full size. The sun / moon button switches dark and light (key T).</p>
-      <h3>Keyboard (computer)</h3>
-      <p>A/D column, W/S height, J/L elbow, I/K wrist, G close, O open, H home, P save pose, V voice,
-      Space stop / release.</p>
+      <h3>Keyboard (computer or phone)</h3>
+      <p>Works with the PC keyboard and with a USB / Bluetooth keyboard plugged into the phone. A/D or
+      &larr;/&rarr; column, W/S or &uarr;/&darr; height (in <b>XY + height</b> mode: move over the table), J/L elbow, I/K wrist,
+      G close, O open, H home, P save pose, + / - speed, X joints / XY, V voice, T dark / light, Space stop / release.
+      The keys are shown in the Manual tab as soon as you press one.</p>
       <h3>About</h3>
-      <p id="about">SCARA Digital Twin 3.1 - MuJoCo, Gazebo and the real robot in one app.</p>
+      <p id="about">SCARA Digital Twin 3.2 - MuJoCo, Gazebo and the real robot in one app.</p>
     </div>
     <button id="closeHelp" class="primary">Got it</button>
   </div>

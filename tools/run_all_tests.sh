@@ -40,11 +40,12 @@ if have_py playwright; then
   HAND=$LOG/hand.y4m; python3 tools/make_hand_video.py "$HAND" > /dev/null
   run "app + website (offline)"   python3 tools/test_app_v3.py --hand-video "$HAND" --shots "$LOG"
   run "app basics"                python3 tools/test_app.py
+  run "gesture camera + gamepads"  env SHOTS="$LOG" python3 tools/test_camera_gamepad.py
   if have_py cv2; then run "webcam cell as a twin" python3 tools/test_hw_twin.py --shots "$LOG"
   else skip "webcam cell as a twin" "pip install opencv-python"; fi
 else
   skip "app + website (offline)" "pip install playwright && playwright install chromium"
-  skip "app basics" "playwright"; skip "webcam cell as a twin" "playwright"
+  skip "app basics" "playwright"; skip "gesture camera + gamepads" "playwright"; skip "webcam cell as a twin" "playwright"
 fi
 
 if [ $QUICK = 1 ]; then echo "(--quick: MuJoCo and Gazebo runs left out)"

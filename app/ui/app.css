@@ -113,7 +113,10 @@ button.on { background: var(--ink); border-color: var(--ink); color: var(--on-in
   border: 3px solid #1a232b; box-shadow: inset 0 0 0 1px #3c4a56;
   overflow: hidden;
 }
-.screen canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+.screen #view { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+/* the screen holds the 3-D pane and, with gesture control on, the camera pane */
+.screen { display: grid; grid-template: "p" minmax(0, 1fr) / minmax(0, 1fr); }
+.pane3d { grid-area: p; position: relative; min-width: 0; min-height: 0; overflow: hidden; }
 .inset-frame {
   position: absolute; top: 8px; right: 8px; border: 2px solid #e9edf0; border-radius: 6px;
   box-shadow: 0 2px 8px #0006; touch-action: none; z-index: 2;   /* pinch it smaller on a phone */
@@ -312,14 +315,6 @@ select { min-height: 44px; border: 1px solid var(--alu-edge); border-radius: var
 .mic.on, .micbtn.on { background: var(--stop); border-color: var(--stop); color: #fff; animation: pulse 1s infinite; }
 @keyframes pulse { 50% { box-shadow: 0 0 0 6px #d3221b33; } }
 #hand.on { background: var(--safety); border-color: var(--safety); color: var(--ink); }
-.handcam { position: absolute; right: 8px; bottom: 8px; width: 132px; border: 2px solid #e9edf0; border-radius: 6px;
-  overflow: hidden; background: #000; box-shadow: 0 2px 8px #0006; }
-.handcam[hidden] { display: none; }
-.handcam canvas { display: block; width: 100%; height: auto; image-rendering: pixelated; }
-.handcam span { position: absolute; left: 5px; top: 3px; right: 5px; font: 600 11px/1.2 BarlowSC, sans-serif; color: #fff;
-  text-shadow: 0 1px 2px #000; }
-.handcam button { position: absolute; right: 4px; bottom: 4px; min-height: 24px; padding: 0 6px; font-size: 11px;
-  background: #ffffffd9; border-color: #fff; }
 h3.sub { margin: 4px 0 0; font: 700 14px Barlow, sans-serif; color: var(--ink-2); }
 .sliders { display: flex; flex-direction: column; gap: 2px; }
 .sliders label { display: grid; grid-template-columns: 64px 1fr 66px; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-2); }
@@ -450,7 +445,7 @@ h3.sub { margin: 4px 0 0; font: 700 14px Barlow, sans-serif; color: var(--ink-2)
 
   /* the 3-D view in its guard window */
   .screen { border: 1px solid var(--alu-edge); border-radius: 12px; box-shadow: 0 10px 40px #0005; }
-  .screen::after { content: ""; position: absolute; inset: 8px; pointer-events: none; z-index: 1;
+  .pane3d::after { content: ""; position: absolute; inset: 8px; pointer-events: none; z-index: 1;
     --c: var(--safety); --l: 26px; --w: 3px;
     background:
       linear-gradient(var(--c) 0 0) top left / var(--l) var(--w), linear-gradient(var(--c) 0 0) top left / var(--w) var(--l),
@@ -463,7 +458,6 @@ h3.sub { margin: 4px 0 0; font: 700 14px Barlow, sans-serif; color: var(--ink-2)
   .viewtools { left: 18px; bottom: 18px; right: auto; }
   .viewtools button { backdrop-filter: blur(6px); }
   .viewtools button.on, .viewtools button.on:hover:not(:disabled) { background: var(--safety); border-color: var(--safety); color: #1d2730; }
-  .handcam { right: 18px; bottom: 18px; width: 190px; }
 
   /* control target as a segmented switch */
   .target { background: var(--well); border-color: var(--alu-edge); border-radius: 10px; }
@@ -546,3 +540,90 @@ h3.sub { margin: 4px 0 0; font: 700 14px Barlow, sans-serif; color: var(--ink-2)
 .mlegend i::before { content: ""; width: 14px; height: 3px; border-radius: 2px; background: var(--c); }
 .mlegend span { margin-left: auto; }
 #mRec.on { background: var(--stop); border-color: var(--stop); color: #fff; }
+
+/* ---------- gesture camera: its own place on the page (Docked), a Window, or Small ----------
+   Docked: phone - above the robot view (the page scrolls to the controls);
+           tablet / PC - top of the right-hand column. The 3-D view is never made smaller. */
+.campane { container: cam / inline-size; grid-area: cam; position: relative; display: flex; flex-direction: column;
+  min-width: 0; min-height: 0; background: #0d1115; color: #fff; overflow: hidden;
+  border: 3px solid #1a232b; border-radius: var(--radius-m); }
+.campane[hidden] { display: none; }
+.cambar { display: flex; align-items: center; gap: 6px; padding: 5px 6px 5px 10px; background: #161d23;
+  border-bottom: 1px solid #2a343c; min-width: 0; flex: none; touch-action: none; }
+.cambar b { font: 700 13px Barlow, sans-serif; letter-spacing: .02em; white-space: nowrap; margin-right: auto;
+  overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.cambar button { min-height: 30px; padding: 0 9px; font-size: 12.5px; background: #222c34; border-color: #36434e; color: #e6ecf1; flex: none; }
+.cambar .seg { border-color: #36434e; flex: none; }
+.cambar .seg button { min-height: 30px; background: #1b2329; color: #93a1ac; border-radius: 0; }
+.cambar .seg button + button { border-left-color: #36434e; }
+.cambar .seg button.on { background: var(--safety); color: #1d2730; }
+.cambar .camx { width: 30px; padding: 0; font-size: 14px; }
+.camview { position: relative; flex: 1 1 auto; min-height: 0; background: #000; }
+.camview video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; transform: scaleX(-1); }
+.camview #handOverlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.camview .maskview { position: absolute; right: 6px; bottom: 6px; width: 22%; max-width: 120px; min-width: 56px; height: auto;
+  border: 1px solid #ffffff55; border-radius: 4px; image-rendering: pixelated; opacity: .9; }
+.camstatus { position: absolute; left: 8px; top: 8px; right: 8px; display: flex; gap: 8px; align-items: flex-start;
+  font: 600 12.5px/1.3 BarlowSC, sans-serif; pointer-events: none; }
+.camstatus span { background: #000000a8; padding: 3px 8px; border-radius: 4px; max-width: 100%; }
+.camstatus em { font-style: normal; background: var(--safety); color: #1d2730; padding: 3px 8px; border-radius: 4px; white-space: nowrap; }
+.camstatus em:empty { display: none; }
+.camgrip, .camsize { display: none; }
+
+/* Docked */
+.app.cam-dock { grid-template-rows: auto auto var(--camh, 30vh) minmax(clamp(260px, 44vh, 620px), 1fr) auto auto;
+  grid-template-areas: "bar" "target" "cam" "screen" "readout" "panel"; height: auto; min-height: 100%; }
+body.cam-dock { overflow-y: auto; }
+.app.cam-dock .tab { max-height: none; }
+.campane[data-cm="dock"] .camsize { display: flex; flex: none; height: 14px; align-items: center; justify-content: center;
+  background: #161d23; cursor: row-resize; touch-action: none; outline: none; }
+.camsize i { width: 44px; height: 4px; border-radius: 3px; background: #5b6a76; }
+.camsize:hover i, .camsize:focus-visible i, .camsize.drag i { background: var(--safety); }
+@media (orientation: landscape) and (min-width: 640px) {
+  .app.cam-dock { height: 100%; min-height: 0; grid-template-rows: auto var(--camh, 34vh) auto auto 1fr;
+    grid-template-areas: "bar bar" "screen cam" "screen target" "screen readout" "screen panel"; }
+  body.cam-dock { overflow-y: hidden; }
+  .app.cam-dock .panel { min-height: 0; overflow-y: auto; }
+}
+@media (min-width: 1100px) and (min-height: 640px) {
+  .app.cam-dock { grid-template-rows: auto var(--camh, clamp(220px, 38vh, 380px)) auto auto minmax(0, 1fr);
+    grid-template-areas: "bar bar bar" "rail screen cam" "rail screen target" "rail screen readout" "rail screen tabc"; }
+  .app.cam-dock .panel { overflow: visible; }
+  .campane { border-color: var(--alu-edge); border-radius: 10px; }
+}
+
+/* Window: floats over the page - drag the title bar, resize from the corner */
+.campane[data-cm="float"] { position: fixed; z-index: 30; min-width: 180px; min-height: 150px; box-shadow: 0 12px 34px #000b; border-color: #ffffff40; }
+.campane[data-cm="float"] .cambar { cursor: move; }
+.campane[data-cm="float"] .camgrip { display: block; position: absolute; right: 0; bottom: 0; width: 22px; height: 22px; cursor: nwse-resize; z-index: 2;
+  background: linear-gradient(135deg, transparent 0 50%, #ffffff80 50% 58%, transparent 58% 68%, #ffffff80 68% 76%, transparent 76%); touch-action: none; }
+
+/* Small: a preview in the robot view's free corner; tap it to dock it again */
+.campane[data-cm="mini"] { position: fixed; z-index: 30; width: clamp(130px, 22vw, 210px); aspect-ratio: 4 / 3.6;
+  border: 2px solid #e9edf0; border-radius: 8px; box-shadow: 0 2px 10px #0008; }
+.campane[data-cm="mini"] .cambar { padding: 2px 3px 2px 6px; }
+.campane[data-cm="mini"] .cambar b { font-size: 11px; }
+.campane[data-cm="mini"] .seg, .campane[data-cm="mini"] #handCal { display: none; }
+.campane[data-cm="mini"] .camx { width: 24px; min-height: 22px; font-size: 11px; }
+.campane[data-cm="mini"] .camview { cursor: zoom-in; }
+.campane[data-cm="mini"] .maskview, .campane[data-cm="mini"] .camstatus em { display: none; }
+.campane[data-cm="mini"] .camstatus { font-size: 10.5px; left: 4px; top: 4px; right: 4px; }
+
+/* narrow camera: icons instead of words (each button keeps its tooltip) */
+@container cam (max-width: 340px) {
+  .cambar b { display: none; }
+  .cambar .seg { margin-right: auto; }
+  .cammode button, #handCal { font-size: 0 !important; width: 32px; padding: 0 !important; }
+  .cammode button::before, #handCal::before { content: attr(data-ic); font-size: 15px; }
+}
+@container cam (max-width: 200px) { #handCal { display: none; } }   /* double-tap the picture instead */
+@container cam (max-width: 440px) { #handCal { font-size: 0 !important; width: 32px; padding: 0 !important; } #handCal::before { content: attr(data-ic); font-size: 15px; } }
+/* keyboard / gamepad seen: their keys in the Manual tab */
+.extin { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding: 7px 10px; font-size: 12.5px;
+  border: 1px dashed var(--alu-edge); border-radius: var(--radius-s); color: var(--ink-2); min-width: 0; }
+.extin[hidden] { display: none; }
+.extin b { color: var(--ink); font-size: 13px; width: 100%; }
+.extin span { white-space: nowrap; }
+.extin kbd { display: inline-block; min-width: 18px; padding: 0 4px; margin-right: 2px; text-align: center; font: 600 11px/18px BarlowSC, sans-serif;
+  border: 1px solid var(--alu-edge); border-bottom-width: 2px; border-radius: 4px; background: var(--alu-2); color: var(--ink); }
+@media (max-width: 400px) { .extin span { white-space: normal; } }

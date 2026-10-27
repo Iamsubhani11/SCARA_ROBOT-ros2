@@ -1,4 +1,4 @@
-/* SCARA Digital Twin 3.1 - phone app and website.
+/* SCARA Digital Twin 3.2 - phone app and website.
  *
  * Talks to scripts/scara_twin_server.py on the PC (port 9090). That server runs the
  * MuJoCo table / cell, follows a running Gazebo cell, and talks to the real robot
@@ -259,7 +259,7 @@ function buildHwCell(lay, top) {
     dir = [-u[0], -u[1]];
   }
   const yaw = Math.atan2(dir[1], dir[0]), nx = -dir[1], ny = dir[0];
-  const back = 0.09, fwd = 0.27, len = back + fwd, w = 0.065;
+  const back = 0.18, fwd = 0.18, len = back + fwd, w = 0.065;              // the pick window in the middle of the belt
   const mx = pick[0] + dir[0] * (fwd - back) / 2, my = pick[1] + dir[1] * (fwd - back) / 2;
   const bt = scene.belt_top || top + 0.035, red = new THREE.MeshStandardMaterial({ color: 0xc62828, roughness: 0.55 });
   const black = new THREE.MeshStandardMaterial({ color: 0x1b1d20, roughness: 0.9 });
@@ -280,23 +280,24 @@ function buildHwCell(lay, top) {
     new THREE.MeshBasicMaterial({ color: 0xf2b705, transparent: true, opacity: 0.35, depthWrite: false }));
   zone.position.set(pick[0] + dir[0] * zc, pick[1] + dir[1] * zc, bt + 0.0005); zone.rotation.z = yaw;
   cell.add(zone);
-  // the webcam stand: on the far side of the belt from the robot, looking across at the pick point
+  // the webcam (as in the reference videos): its stand beside the belt on the far side from the robot, the arm reaching
+  // over the belt so the camera hangs above the middle of the belt, looking down at the pick window
   const toCol = [k.column[0] - pick[0], k.column[1] - pick[1]];
   const side = toCol[0] * nx + toCol[1] * ny > 0 ? -1 : 1;
-  const sx = pick[0] + side * nx * 0.13, sy = pick[1] + side * ny * 0.13, H = 0.24;
-  box(0.07, 0.05, 0.006, sx, sy, top + 0.003, black);                          // foot
+  // the head sits 6 cm to the downstream side of the pick window, so the gripper can come down past it
+  const up = 0.06, hx = pick[0] - dir[0] * up, hy = pick[1] - dir[1] * up;
+  const off = w / 2 + 0.07, sx = hx + side * nx * off, sy = hy + side * ny * off, H = 0.26;
+  box(0.05, 0.07, 0.006, sx, sy, top + 0.003, black, yaw);                     // foot
   box(0.012, 0.012, H, sx, sy, top + H / 2, black);                            // pole
-  const look = Math.atan2(pick[1] - sy, pick[0] - sx);
-  const armL = 0.06, ax = sx + Math.cos(look) * armL / 2, ay = sy + Math.sin(look) * armL / 2;
-  box(armL, 0.01, 0.01, ax, ay, top + H, black, look);                          // short arm
+  const look = Math.atan2(hy - sy, hx - sx);
+  box(off + 0.01, 0.012, 0.012, (sx + hx) / 2, (sy + hy) / 2, top + H, black, look);   // arm over the belt
   const camG = new THREE.Group();
-  camG.position.set(sx + Math.cos(look) * armL, sy + Math.sin(look) * armL, top + H - 0.012);
-  camG.rotation.z = look;
-  const tilt = Math.atan2(H - 0.012 - (bt - top), Math.hypot(pick[0] - camG.position.x, pick[1] - camG.position.y));
-  const body = new THREE.Group(); body.rotation.y = tilt; camG.add(body);
-  const cb = new THREE.Mesh(new THREE.BoxGeometry(0.025, 0.07, 0.03), black); body.add(cb);
-  const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.006, 20), new THREE.MeshStandardMaterial({ color: 0x0b0c0e, roughness: 0.2, metalness: 0.4 }));
-  lens.rotation.z = Math.PI / 2; lens.position.x = 0.0145; body.add(lens);
+  camG.position.set(hx, hy, top + H - 0.02);
+  camG.rotation.z = yaw;
+  camG.rotation.y = Math.atan2(up, H - 0.02 - (bt - top));                    // tipped towards the pick window
+  const cb = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.07, 0.025), black); camG.add(cb);
+  const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.009, 0.009, 0.006, 20), new THREE.MeshStandardMaterial({ color: 0x0b0c0e, roughness: 0.2, metalness: 0.4 }));
+  lens.rotation.x = Math.PI / 2; lens.position.z = -0.0145; camG.add(lens);    // pointing down at the belt
   cell.add(camG);
   // where the robot drops each colour (taught drop poses)
   const pad = 0.05;
@@ -860,7 +861,8 @@ setInterval(() => {
   if (app.hand && !lx && !ly) { const h = window.ScaraHand.out; if (h.seen) { lx = handDead(h.x); ly = handDead(h.y); } }
   const kb = keyVec();
   if (kb.active) { lx = lx || kb.lx; ly = ly || kb.ly; }
-  const rx = dead(R.x) || kb.rx, ry = dead(R.y) || kb.ry;
+  if (pad.active) { lx = lx || pad.lx; ly = ly || pad.ly; }
+  const rx = dead(R.x) || kb.rx || pad.rx, ry = dead(R.y) || kb.ry || pad.ry;
   const active = lx || ly || rx || ry;
   if (!active) {
     if (app.cart && now - idleSince > 400) { app.cart = null; app.cartQ = null; }
@@ -1182,7 +1184,7 @@ async function handOn() {
     return;
   }
   try {
-    $('handCam').hidden = false;
+    camShow(true);
     handStatus('Starting the camera…');
     $('hand').classList.add('on'); $('vHand').classList.add('on');
     await Promise.race([window.ScaraHand.start($('handVideo'), $('handView'), handStatus),
@@ -1192,7 +1194,7 @@ async function handOn() {
     if (app.tilt) $('tilt').click();
   } catch (e) {
     window.ScaraHand.stop();
-    $('handCam').hidden = true;
+    camShow(false);
     $('hand').classList.remove('on'); $('vHand').classList.remove('on');
     toast(location.protocol === 'http:' && !['localhost', '127.0.0.1'].includes(location.hostname)
       ? 'The browser only allows the camera on http://localhost (or https) - use the PC itself or the Android app'
@@ -1203,12 +1205,199 @@ function handOff() {
   window.ScaraHand.stop();
   app.hand = false;
   $('hand').classList.remove('on'); $('vHand').classList.remove('on');
-  $('handCam').hidden = true;
+  camShow(false);
 }
 const handToggle = () => (app.hand || $('hand').classList.contains('on') ? handOff() : handOn());
 on('hand', handToggle);
 on('vHand', handToggle);
 on('handCal', () => window.ScaraHand.calibrate());
+on('camClose', () => handOff());
+
+/* The gesture camera, like the camera window of Gazebo / MuJoCo - it never squeezes the robot view:
+   Docked - its own place: above the robot on a phone, top of the right column on a tablet or PC
+            (drag the bar under the picture to make it taller or shorter)
+   Window - floats over the page; drag the title bar, resize from the corner
+   Small  - a preview in the robot view's bottom-right corner; tap it to dock it again
+   x      - closes the camera and turns gesture control off. Mode, size and window place are remembered. */
+const screenEl = $('screen'), camEl = $('handCam'), appEl = document.querySelector('.app');
+let camMode = store.get('camMode2', 'dock');
+if (!['dock', 'float', 'mini'].includes(camMode)) camMode = 'dock';
+let camH = +store.get('camH', 0) || 0;                      // docked height in px (0 = the layout's default)
+let camRect = Object.assign({ x: 0.55, y: 0.12, w: 0.36, h: 0.42 }, store.get('camRect2', {}) || {});
+function camApply() {
+  const shown = !camEl.hidden;
+  camEl.dataset.cm = camMode;
+  appEl.classList.toggle('cam-dock', shown && camMode === 'dock');
+  document.body.classList.toggle('cam-dock', shown && camMode === 'dock');
+  if (camH) appEl.style.setProperty('--camh', camH + 'px'); else appEl.style.removeProperty('--camh');
+  const vw = innerWidth, vh = innerHeight;
+  camEl.style.left = camEl.style.top = camEl.style.width = camEl.style.height = '';
+  if (shown && camMode === 'float') {
+    const w = clamp(camRect.w * vw, 180, vw), h = clamp(camRect.h * vh, 150, vh);
+    camEl.style.width = w + 'px'; camEl.style.height = h + 'px';
+    camEl.style.left = clamp(camRect.x * vw, 0, vw - w) + 'px'; camEl.style.top = clamp(camRect.y * vh, 0, vh - h) + 'px';
+  } else if (shown && camMode === 'mini') {                    // bottom-right of the robot view, clear of its buttons
+    const r = screenEl.getBoundingClientRect(), w = clamp(vw * 0.22, 130, 210), h = w * 0.9;
+    camEl.style.left = Math.max(0, r.right - w - 10) + 'px'; camEl.style.top = Math.max(0, r.bottom - h - 10) + 'px';
+  }
+  document.querySelectorAll('#camMode button').forEach((b) => b.classList.toggle('on', b.dataset.cm === camMode));
+  requestAnimationFrame(resize);
+}
+function camShow(v) { camEl.hidden = !v; camApply(); }
+function setCamMode(m) { camMode = m; store.set('camMode2', m); camApply(); }
+document.querySelectorAll('#camMode button').forEach((b) => b.addEventListener('click', () => setCamMode(b.dataset.cm)));
+$('camView').addEventListener('click', () => { if (camMode === 'mini') setCamMode('dock'); });
+$('camView').addEventListener('dblclick', () => { if (camMode !== 'mini') window.ScaraHand.calibrate(); });
+window.addEventListener('resize', () => { if (!camEl.hidden) camApply(); });
+new ResizeObserver(() => { if (!camEl.hidden && camMode === 'mini') camApply(); }).observe(screenEl);
+function camDrag(el, onMove, onEnd) {        // pointer drag (mouse, finger, pen)
+  el.addEventListener('pointerdown', (e) => {
+    if (e.target.closest('button')) return;
+    e.preventDefault(); el.setPointerCapture(e.pointerId); el.classList.add('drag');
+    const x0 = e.clientX, y0 = e.clientY, r0 = camEl.getBoundingClientRect();
+    const mv = (ev) => onMove(ev.clientX - x0, ev.clientY - y0, r0);
+    const up = () => { el.classList.remove('drag'); el.removeEventListener('pointermove', mv); el.removeEventListener('pointerup', up);
+      el.removeEventListener('pointercancel', up); onEnd(); };
+    el.addEventListener('pointermove', mv); el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
+  });
+}
+const camHMax = () => Math.max(160, innerHeight * 0.7);
+camDrag($('camSplit'), (dx, dy, r0) => { camH = Math.round(clamp(r0.height + dy, 140, camHMax())); camApply(); }, () => store.set('camH', camH));
+$('camSplit').addEventListener('keydown', (e) => {
+  const d = { ArrowUp: -20, ArrowDown: 20 }[e.key];
+  if (!d) return;
+  e.preventDefault(); camH = Math.round(clamp((camH || camEl.getBoundingClientRect().height) + d, 140, camHMax())); camApply(); store.set('camH', camH);
+});
+camDrag($('camBar'), (dx, dy, r0) => {
+  if (camMode !== 'float') return;
+  camRect.x = (r0.left + dx) / innerWidth; camRect.y = (r0.top + dy) / innerHeight; camApply();
+}, () => store.set('camRect2', camRect));
+camDrag($('camGrip'), (dx, dy, r0) => {
+  camRect.w = (r0.width + dx) / innerWidth; camRect.h = (r0.height + dy) / innerHeight; camApply();
+}, () => store.set('camRect2', camRect));
+camApply();
+
+/* what the hand tracker sees, drawn over the (mirrored) camera picture */
+function camOverlay() {
+  requestAnimationFrame(camOverlay);
+  if ($('handCam').hidden || !window.ScaraHand.overlay) return;
+  const cv = $('handOverlay'), vid = $('handVideo'), box = cv.getBoundingClientRect();
+  const dpr = Math.min(2, window.devicePixelRatio || 1), W = Math.round(box.width * dpr), H = Math.round(box.height * dpr);
+  if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
+  const g = cv.getContext('2d'); g.clearRect(0, 0, W, H);
+  const vw = vid.videoWidth || 4, vh = vid.videoHeight || 3, k = Math.min(W / vw, H / vh);   // object-fit: contain
+  const pw = vw * k, ph = vh * k, ox = (W - pw) / 2, oy = (H - ph) / 2;
+  const X = (u) => ox + (1 - u) * pw, Y = (v) => oy + v * ph;                            // mirrored like the picture
+  const v = window.ScaraHand.overlay();
+  g.lineWidth = 2 * dpr; g.font = `${12 * dpr}px sans-serif`;
+  if (v.state === 'calibrating' || v.state === 'waiting') {
+    const b = v.box || [0.35, 0.3, 0.65, 0.7];
+    g.strokeStyle = '#ffc61a'; g.setLineDash([8 * dpr, 6 * dpr]);
+    g.strokeRect(X(b[2]), Y(b[1]), X(b[0]) - X(b[2]), Y(b[3]) - Y(b[1])); g.setLineDash([]);
+    if (v.calLeft > 0) { g.fillStyle = '#ffc61a'; g.fillText(`hold still ${v.calLeft.toFixed(1)} s`, X(b[2]), Y(b[1]) - 6 * dpr); }
+  }
+  if (v.home) {
+    g.strokeStyle = '#ffffffaa';
+    g.beginPath(); g.arc(X(v.home.x), Y(v.home.y), v.deadR * pw, 0, 7); g.stroke();             // still zone: the arm does not move
+    g.strokeStyle = '#ffffff44';
+    g.beginPath(); g.arc(X(v.home.x), Y(v.home.y), v.travel * pw, 0, 7); g.stroke();            // full speed at this ring
+  }
+  if (v.blob && v.home) {
+    g.strokeStyle = '#ffc61a'; g.beginPath(); g.moveTo(X(v.home.x), Y(v.home.y)); g.lineTo(X(v.blob.x), Y(v.blob.y)); g.stroke();
+  }
+  if (v.blob) {
+    const fist = v.out && v.out.fist;
+    g.fillStyle = fist ? '#e8463a' : '#2fbf71';
+    g.beginPath(); g.arc(X(v.blob.x), Y(v.blob.y), 9 * dpr, 0, 7); g.fill();
+    g.fillStyle = '#fff'; g.fillText(fist ? 'fist: gripper closes' : 'open hand', X(v.blob.x) + 12 * dpr, Y(v.blob.y) + 4 * dpr);
+  }
+  $('handGrip').textContent = v.state === 'tracking' && v.out && v.out.fist ? 'GRIP' : '';
+}
+requestAnimationFrame(camOverlay);
+
+/* External gamepads (USB / Bluetooth: Zebronics, Xbox, PlayStation, generic) on the website and the Android app.
+   Left stick and right stick drive like the on-screen joysticks. Buttons:
+   A / cross close the gripper, B / circle open it, X / square home, Y / triangle add a teach point,
+   LB / RB slower / faster, Start emergency stop (press again to release), Select belt on / off, d-pad the same as the left stick. */
+const pad = { lx: 0, ly: 0, rx: 0, ry: 0, active: false, name: '', prev: [], dev: {} };
+/* Safety rules (bug 32: a phone reported a device whose triggers rest at -1; they were read as a
+   right stick held over and the wrist kept turning):
+   - a pad does nothing until a person uses it: a button is pressed or a stick is moved well away
+     from where it rested when it was first seen;
+   - every axis is measured from its resting value, and an axis that does not rest near 0
+     (a trigger) is never used as a stick. */
+const near0 = (v) => Math.abs(v) < 0.3;
+function padState(gp) {
+  let st = pad.dev[gp.index];
+  if (!st || st.id !== gp.id) {
+    st = pad.dev[gp.index] = { id: gp.id, rest: gp.axes.map((v) => v || 0), maxDev: gp.axes.map(() => 0),
+      prevBtn: gp.buttons.map((x) => !!x.pressed), engaged: false };
+  }
+  return st;
+}
+function padAxes(gp, st) {
+  const a = gp.axes, std = gp.mapping === 'standard';
+  const ok = (i) => i < a.length && near0(st.rest[i]);
+  const ax = (i) => (ok(i) ? (a[i] || 0) - st.rest[i] : 0);
+  for (let i = 0; i < a.length; i++) st.maxDev[i] = Math.max(st.maxDev[i], Math.abs(ax(i)));
+  let rX, rY;
+  if (std) { rX = 2; rY = 3; } else {
+    // generic pads: right stick X on axis 2 (or 3); Y is whichever of 5 / 3 / 4 the person actually moves
+    rX = ok(2) ? 2 : 3;
+    const cand = [5, 3, 4].filter((i) => i !== rX && ok(i));
+    rY = cand.sort((p, q) => st.maxDev[q] - st.maxDev[p])[0];
+    if (rY === undefined) rY = -1;
+  }
+  let lx = ax(0), ly = -ax(1), rx = ax(rX), ry = rY >= 0 ? -ax(rY) : 0;
+  const b = (i) => !!(gp.buttons[i] && gp.buttons[i].pressed);
+  if (std) { lx = lx || (b(15) ? 1 : 0) - (b(14) ? 1 : 0); ly = ly || (b(12) ? 1 : 0) - (b(13) ? 1 : 0); }
+  else if (a.length >= 10 && Math.abs(a[9]) <= 1.01 && Math.abs(st.rest[9]) > 1.05) {
+    // hat switch on axis 9 (DirectInput pads): -1 up, -1/7 right, 3/7 down, 5/7 left; about 1.29 = not pressed
+    const h = Math.round((a[9] + 1) * 3.5);
+    if (h === 0) ly = 1; else if (h === 2) lx = 1; else if (h === 4) ly = -1; else if (h === 6) lx = -1;
+  }
+  return { lx, ly, rx, ry };
+}
+function padPoll() {
+  const list = navigator.getGamepads ? [...navigator.getGamepads()].filter((g) => g && g.connected) : [];
+  pad.lx = pad.ly = pad.rx = pad.ry = 0; pad.active = false;
+  if (!list.length) return;
+  const d = (x) => (Math.abs(x) < 0.15 ? 0 : Math.sign(x) * Math.min(1, (Math.abs(x) - 0.15) / 0.8));
+  for (const gp of list) {
+    const st = padState(gp);
+    const v = padAxes(gp, st);
+    const now = gp.buttons.map((x) => !!x.pressed), was = st.prevBtn, hit = (i) => now[i] && !was[i];
+    st.prevBtn = now;
+    if (!st.engaged) {                          // wait for a person: a new button press or a real stick push
+      if (now.some((x, i) => x && !was[i]) || [v.lx, v.ly, v.rx, v.ry].some((x) => Math.abs(x) > 0.5)) {
+        st.engaged = true;
+        $('extPad').hidden = false; $('padName').textContent = 'Gamepad: ' + (gp.id.replace(/\s*\(.*$/, '').slice(0, 40) || 'connected');
+        toast(`Joystick ready: ${gp.id.replace(/\s*\(.*$/, '').slice(0, 40) || 'gamepad'}`);
+      } else continue;
+    }
+    pad.name = gp.id;
+    pad.lx = pad.lx || d(v.lx); pad.ly = pad.ly || d(v.ly); pad.rx = pad.rx || d(v.rx); pad.ry = pad.ry || d(v.ry);
+    if (hit(0)) { cmd('gripper', { close: true }); buzz(25); }
+    if (hit(1)) cmd('gripper', { close: false });
+    if (hit(2)) cmd('home');
+    if (hit(3)) cmd('teach_add');
+    if (hit(4) || hit(5)) {
+      const sp = $('speed');
+      sp.value = clamp(+sp.value + (hit(5) ? 10 : -10), +sp.min, +sp.max);
+      sp.dispatchEvent(new Event('input')); sp.dispatchEvent(new Event('change')); toast(`Speed ${sp.value} %`);
+    }
+    if (hit(9)) $('estop').click();
+    if (hit(8)) { app.padBelt = !app.padBelt; cmd('conveyor', { run: app.padBelt }); toast(app.padBelt ? 'Belt on' : 'Belt off'); }
+  }
+  pad.active = !!(pad.lx || pad.ly || pad.rx || pad.ry);
+}
+window.addEventListener('gamepadconnected', (e) => { delete pad.dev[e.gamepad.index]; });   // shown once it is actually used
+window.addEventListener('gamepaddisconnected', (e) => {
+  const was = pad.dev[e.gamepad.index] && pad.dev[e.gamepad.index].engaged;
+  delete pad.dev[e.gamepad.index]; pad.active = false;
+  if (was) { $('extPad').hidden = true; toast('Joystick disconnected'); }
+});
+setInterval(padPoll, 30);
 window.onNativePause = () => { if (app.hand) handOff(); };
 setInterval(() => {                         // fist closes, open hand opens (only on a change)
   if (!app.hand) return;
@@ -1267,15 +1456,30 @@ setInterval(() => {                          // gripper slider follows the gripp
 const keys = new Set();
 function keyVec() {
   const k = (a, b) => (keys.has(a) ? 1 : 0) - (keys.has(b) ? 1 : 0);
-  const v = { lx: k('d', 'a'), ly: k('w', 's'), rx: k('l', 'j'), ry: k('i', 'k') };
+  const v = { lx: k('d', 'a') || k('arrowright', 'arrowleft'), ly: k('w', 's') || k('arrowup', 'arrowdown'), rx: k('l', 'j'), ry: k('i', 'k') };
   v.active = !!(v.lx || v.ly || v.rx || v.ry);
   return v;
 }
+const ARROWS = ['arrowleft', 'arrowright', 'arrowup', 'arrowdown'];
+function showKeys() {                         // a real keyboard was used (PC, or one plugged into the phone)
+  if (!$('extKeys').hidden) return;
+  $('extKeys').hidden = false; store.set('kbSeen', 1);
+}
+if (store.get('kbSeen', 0)) $('extKeys').hidden = false;
 document.addEventListener('keydown', (e) => {
-  if (e.target.closest('input, select, textarea') || e.ctrlKey || e.metaKey || e.altKey) return;
+  // typing in a text box is not driving; sliders keep their own arrow keys but still let WASD drive
+  const t = e.target, typing = t.closest('select, textarea') || (t.closest('input') && t.type !== 'range' && t.type !== 'checkbox');
+  if (typing || e.ctrlKey || e.metaKey || e.altKey) return;
   const k = e.key.toLowerCase();
-  if ('adwsjlik'.includes(k) && k.length === 1) { keys.add(k); e.preventDefault(); return; }
+  if (e.isTrusted) showKeys();
+  if (ARROWS.includes(k) && t.type === 'range') return;
+  if (('adwsjlik'.includes(k) && k.length === 1) || ARROWS.includes(k)) { keys.add(k); e.preventDefault(); return; }
   if (e.repeat) return;
+  if (k === '+' || k === '=' || k === '-' || k === '_') {
+    const sp = $('speed'); sp.value = clamp(+sp.value + (k === '+' || k === '=' ? 10 : -10), +sp.min, +sp.max);
+    sp.dispatchEvent(new Event('input')); sp.dispatchEvent(new Event('change')); toast(`Speed ${sp.value} %`); return;
+  }
+  if (k === 'x') { setDrive(app.drive === 'xy' ? 'joints' : 'xy'); toast(app.drive === 'xy' ? 'Sticks: XY + height' : 'Sticks: joints'); return; }
   if (k === ' ') { e.preventDefault(); $('estop').click(); }
   else if (k === 'g') cmd('gripper', { close: true });
   else if (k === 'o') cmd('gripper', { close: false });
@@ -1497,7 +1701,7 @@ setTimeout(() => { showKinOverlay(); if ($('fkX').offsetParent && !$('kX').value
 /* ------------------------------------------------------------------ v3.1: name, start screen, joint bars */
 (function brand() {
   const b = window.SCARA_BRAND || {};
-  const ver = b.version || '3.1';
+  const ver = b.version || '3.2';
   if (b.name) {
     document.documentElement.classList.add('named');
     $('nameplate').textContent = b.name; $('nameplate').hidden = false;
@@ -1743,7 +1947,7 @@ refreshEnabled();
 requestAnimationFrame(frame);
 
 window.scaraDebug = { app, cmd, setWorld, setDrive, runSpoken, handOn, handOff, keyVec, fkFull, ikBoth, solveKin, setKinInputs, kinTapAt, MG, trailCount: () => trailPts.length,
-  insetOff: () => insetOff, ghostVisible: () => ghost.base.visible };
+  insetOff: () => insetOff, pad, setCamMode, camState: () => ({ mode: camMode, h: camH, rect: camRect }), ghostVisible: () => ghost.base.visible };
 const firstRun = !store.get('helpSeen', false);
 if (firstRun) $('helpSheet').hidden = false;          // first start: the short guide, then the connect sheet   // for tools/test_app.py
 

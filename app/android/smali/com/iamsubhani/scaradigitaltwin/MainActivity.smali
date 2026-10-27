@@ -74,6 +74,11 @@
     const-string v1, "file:///android_asset/ui/index.html"
     invoke-virtual {v0, v1}, Landroid/webkit/WebView;->loadUrl(Ljava/lang/String;)V
     invoke-virtual {p0, v0}, Landroid/app/Activity;->setContentView(Landroid/view/View;)V
+    # keys of a USB / Bluetooth keyboard and gamepad go to the page
+    const/4 v1, 0x1
+    invoke-virtual {v0, v1}, Landroid/view/View;->setFocusable(Z)V
+    invoke-virtual {v0, v1}, Landroid/view/View;->setFocusableInTouchMode(Z)V
+    invoke-virtual {v0}, Landroid/view/View;->requestFocus()Z
     return-void
 .end method
 
