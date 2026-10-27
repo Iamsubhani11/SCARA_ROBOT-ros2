@@ -30,7 +30,7 @@ import numpy as np
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 UI = os.path.join(ROOT, 'app', 'ui')
-VERSION = '3.2.1'
+VERSION = '3.3.0'
 ANDROID = os.path.join(ROOT, 'app', 'android')
 MESHES = ['base_link', 'column_link', 'shoulder_link', 'forearm_link', 'wrist_link',
           'left_finger_link', 'right_finger_link', 'camera_link', 'shoulder_name']

@@ -5,9 +5,9 @@ Used by MuJoCo, Gazebo, the real robot and the server alike – one place for ev
 | module | |
 |---|---|
 | `scara_scene.py` | every dimension: robot, table, belt, pucks, bins, cameras (change the cell here) |
-| `scara_kinematics.py` | forward / inverse kinematics with the real link lengths (`python3 common/scara_kinematics.py` tests it) |
+| `scara_kinematics.py` | forward / inverse kinematics with the real link lengths, the Jacobian and belt following (`track_line`, resolved-rate) – `python3 common/scara_kinematics.py` checks them |
 | `scara_safety.py` | the safety mode in front of every manual control |
-| `scara_sorter_core.py` | sorting, command mode, sequences, stop-and-pick |
+| `scara_sorter_core.py` | sorting, command mode, sequences, stop-and-pick, belt tracking (`track on` / `track off`, command cell) |
 | `scara_feeder.py` | puts pucks on the belt in the simulations |
 | `scara_vision.py` | colour + depth puck detection for the simulated cameras |
 | `scara_voice.py` | wake word, speech to text, command parsing |

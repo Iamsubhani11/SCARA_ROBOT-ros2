@@ -7,8 +7,10 @@
 | `scara_hw_cell.py` | the autonomous webcam cell: teach the poses (`--teach`), then sort or take commands |
 | `scara_cam2d.py` | the webcam detector used by the cell |
 | `scara_twin_bridge.py` | ROS 2 node: the real robot as a ghost in RViz (`launch/digital_twin.launch.py`) |
+| `scara_bringup.py` | **first start of a newly built robot**: connection, homing, each joint's direction, gripper, relay, twin check – step by step ([docs/HARDWARE_GUIDE.md](../docs/HARDWARE_GUIDE.md)) |
 
 ```bash
+python3 real_robot/scara_bringup.py --port /dev/ttyACM0          # once, after building (--no-switches without limit switches)
 python3 real_robot/scara_camera_setup.py
 python3 real_robot/scara_hw_cell.py --port /dev/ttyACM0 --teach
 python3 server/scara_twin_server.py --sim hardware --port /dev/ttyACM0     # the cell in the app / website

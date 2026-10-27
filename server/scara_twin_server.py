@@ -30,7 +30,7 @@ puck / table guards and the emergency stop (STOP button, Space key).
 Teach & replay: save poses, play them back in order (stored in ~/.scara_teach_points.json).
 """
 import os as _os, sys as _sys  # noqa: E401 - the other folders of this package (common/, mujoco/ ...)
-_sys.path[:0] = [_os.path.join(_os.path.dirname(_os.path.abspath(__file__)), '..', _d)
+_sys.path[:0] = [_os.path.join(_os.path.dirname(_os.path.realpath(__file__)), '..', _d)
                  for _d in ('common', 'mujoco', 'gazebo', 'real_robot', 'server', 'gesture_control')]
 import argparse
 import base64
@@ -79,7 +79,8 @@ def _find_ui():
 UI_DIR = _find_ui()
 MIME = {'.html': 'text/html; charset=utf-8', '.js': 'application/javascript; charset=utf-8',
         '.css': 'text/css; charset=utf-8', '.ttf': 'font/ttf', '.png': 'image/png', '.svg': 'image/svg+xml',
-        '.json': 'application/json', '.ico': 'image/x-icon', '.webmanifest': 'application/manifest+json'}
+        '.json': 'application/json', '.ico': 'image/x-icon', '.webmanifest': 'application/manifest+json',
+        '.wasm': 'application/wasm', '.task': 'application/octet-stream'}   # MediaPipe (app/ui/lib/mediapipe)
 JOINTS = S.ARM_JOINTS + ['left_finger_joint']
 LIMITS = {**{n: S.LIMITS[n] for n in S.ARM_JOINTS}, 'left_finger_joint': (S.LIMITS['left_finger_joint'][0], 0.0)}
 
@@ -405,6 +406,7 @@ class GazeboSim(NoSim):
         st = self.sorter_state if time.time() - self.sorter_time < 5.0 else {}
         return {'status': list(self.status)[-6:], 'active': st.get('active', []), 'sorted': st.get('sorted'),
                 'sequence': st.get('sequence', []), 'count_left': st.get('count_left'),
+                'tracking': st.get('tracking', False), 'tracked': st.get('tracked', 0),
                 'cell_mode': self.world if self.world != 'manual' else None, 'world': self.world,
                 'worlds': list(self.WORLDS), 'switching': self.switching}
 
@@ -684,6 +686,36 @@ class TwinCore:
             with open(path, 'w') as fh:
                 fh.write(csv)
             self.say(f'Recording saved: {path}')
+        elif c == 'teach_set':
+            # a whole program at once (Teach tab: Load / Import): a list of poses, checked and clamped
+            pts = args.get('points')
+            if not isinstance(pts, list) or len(pts) > 500:
+                return 'A program is a list of up to 500 poses'
+            lim, clean = LIMITS, []
+            for p in pts:
+                if not isinstance(p, dict):
+                    return 'Every pose must be a set of joint values'
+                try:
+                    q = {k: round(min(max(float(p.get(k, 0.0)), lim[k][0]), lim[k][1]), 4) for k in JOINTS}
+                except (TypeError, ValueError):
+                    return 'A pose has a value that is not a number'
+                clean.append(q)
+            self.playing = None
+            self.teach = clean
+            self._save_teach()
+            self.say(f'Program loaded: {len(clean)} poses')
+        elif c == 'save_program':
+            # Teach tab -> Export in the phone app: the program file is kept on the PC
+            import re
+            name = re.sub(r'[^A-Za-z0-9_.-]', '_', str(args.get('name') or 'scara_program'))[:60]
+            if not name.endswith('.json'):
+                name += '.json'
+            folder = os.path.join(os.path.expanduser('~'), 'scara_programs')
+            os.makedirs(folder, exist_ok=True)
+            path = os.path.join(folder, name)
+            with open(path, 'w') as fh:
+                json.dump({'scara_program': 1, 'name': name[:-5], 'poses': self.teach}, fh, indent=1)
+            self.say(f'Program saved: {path}')
         elif c == 'fake_freeze':
             # tests only: the software robot stops answering for a few seconds, like a hung Arduino
             if not link or not hasattr(link, 'frozen_until'):
@@ -786,6 +818,13 @@ class TwinCore:
                 self.say('Asked the robot to stop picking')
             else:
                 self.say(f'Picking {color} until the next colour')
+        elif c == 'belt_tracking':
+            # command cell: pick from the moving belt (Jacobian) instead of stopping it
+            on = bool(args.get('on'))
+            if not self.sim.commands:
+                return 'Belt tracking works in the command cell (MuJoCo or Gazebo, world "command")'
+            self.sim.request('track on' if on else 'track off')
+            self.say('Belt tracking ' + ('on: the robot follows the moving belt' if on else 'off: the belt stops for every pick'))
         elif c in ('stop_all', 'estop'):
             self.safety.estop = True
             self.playing = None

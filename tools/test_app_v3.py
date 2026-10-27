@@ -144,15 +144,21 @@ async def main(a):
         tk = await pg.evaluate("document.getElementById('ticker').children.length")
         check(tk == 0, f'old messages left the 3-D view ({tk} left)')
 
-        # ---- hand control with the fake camera
+        # ---- hand control with the fake camera: the simple oval "hand" is for the colour tracker, so
+        # MediaPipe is made to fail here - this checks the automatic fallback (MediaPipe itself is
+        # tested with real hand photos in tools/test_gesture_mediapipe.py)
         await pg.click('#tabs [data-tab=manual]')
         await pg.click('#drive [data-d=joints]')
+        await pg.evaluate('window.SCARA_NO_MEDIAPIPE = true')
         await pg.click('#hand')
-        await pg.wait_for_timeout(500)
+        await pg.wait_for_timeout(1500)
         check(await pg.evaluate("!document.getElementById('handCam').hidden"), 'hand: camera picture shown')
+        eng = await pg.evaluate("[window.ScaraHand.engine, document.getElementById('handEngine').textContent]")
+        check(eng[0] == 'skin' and 'Simple colour tracking' in eng[1] and 'MediaPipe' in eng[1],
+              f'hand: MediaPipe not available -> colour tracker takes over and says so {eng}')
         if a.hand_video:
             c0 = await pg.evaluate(f'{S}.q.column_joint')
-            await pg.wait_for_timeout(5000)            # calibration (2 s) then the hand still in the middle
+            await pg.wait_for_timeout(4000)            # calibration (2 s) then the hand still in the middle
             st = await pg.evaluate("document.getElementById('handText').textContent")
             check('on' in st, f'hand: calibrated ({st})')
             c1 = await pg.evaluate(f'{S}.q.column_joint')
@@ -262,8 +268,12 @@ async def main(a):
         await pg.evaluate("document.querySelector('#tabs [data-tab=manual]').click()")
         await pg.click('#mmode [data-m=sliders]')
         await pg.evaluate("(() => { const e = document.querySelector('#mSliders [data-j=wrist_joint]'); e.value = -1.0; e.dispatchEvent(new Event('input')); e.dispatchEvent(new Event('change')); })()")
-        await pg.wait_for_timeout(3500)
-        q = await pg.evaluate(f'{S}.q.wrist_joint')
+        q = 0.0
+        for _ in range(40):
+            await pg.wait_for_timeout(250)
+            q = await pg.evaluate(f'{S}.q.wrist_joint')
+            if abs(q + 1.0) < 0.02:
+                break
         vis = await pg.evaluate("[getComputedStyle(document.getElementById('mSliders')).display, getComputedStyle(document.querySelector('.sticks')).display]")
         check(abs(q + 1.0) < 0.02 and vis == ['flex', 'none'], f'Manual sliders mode: wrist -> {q:.3f}, shown {vis}')
         await pg.click('#mmode [data-m=sticks]')

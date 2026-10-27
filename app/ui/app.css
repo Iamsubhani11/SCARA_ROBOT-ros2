@@ -568,6 +568,12 @@ h3.sub { margin: 4px 0 0; font: 700 14px Barlow, sans-serif; color: var(--ink-2)
 .camstatus span { background: #000000a8; padding: 3px 8px; border-radius: 4px; max-width: 100%; }
 .camstatus em { font-style: normal; background: var(--safety); color: #1d2730; padding: 3px 8px; border-radius: 4px; white-space: nowrap; }
 .camstatus em:empty { display: none; }
+.camengine { position: absolute; left: 8px; bottom: 8px; background: #000000a8; color: #fff; padding: 2px 7px; border-radius: 4px;
+  font-size: 11px; max-width: calc(100% - 16px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
+.camengine:empty { display: none; }
+.campane[data-engine="mediapipe"] .maskview, .campane[data-engine="error"] .maskview { display: none; }
+.campane[data-engine="mediapipe"] .camengine { background: #1c6ed6d0; }
+.campane[data-cm="mini"] .camengine { display: none; }
 .camgrip, .camsize { display: none; }
 
 /* Docked */
@@ -603,7 +609,11 @@ body.cam-dock { overflow-y: auto; }
   border: 2px solid #e9edf0; border-radius: 8px; box-shadow: 0 2px 10px #0008; }
 .campane[data-cm="mini"] .cambar { padding: 2px 3px 2px 6px; }
 .campane[data-cm="mini"] .cambar b { font-size: 11px; }
-.campane[data-cm="mini"] .seg, .campane[data-cm="mini"] #handCal { display: none; }
+.campane[data-cm="mini"] .seg, .campane[data-cm="mini"] #handCal, .campane[data-cm="mini"] #handEng { display: none; }
+/* MediaPipe / colour switch: always an icon - the picture already says which tracker runs */
+#handEng { font-size: 0 !important; width: 32px; padding: 0 !important; }
+#handEng::before { content: attr(data-ic); font-size: 15px; }
+#handEng.skin::before { content: '◐'; }
 .campane[data-cm="mini"] .camx { width: 24px; min-height: 22px; font-size: 11px; }
 .campane[data-cm="mini"] .camview { cursor: zoom-in; }
 .campane[data-cm="mini"] .maskview, .campane[data-cm="mini"] .camstatus em { display: none; }
@@ -616,7 +626,7 @@ body.cam-dock { overflow-y: auto; }
   .cammode button, #handCal { font-size: 0 !important; width: 32px; padding: 0 !important; }
   .cammode button::before, #handCal::before { content: attr(data-ic); font-size: 15px; }
 }
-@container cam (max-width: 200px) { #handCal { display: none; } }   /* double-tap the picture instead */
+@container cam (max-width: 200px) { #handCal, #handEng { display: none; } }   /* double-tap the picture instead */
 @container cam (max-width: 440px) { #handCal { font-size: 0 !important; width: 32px; padding: 0 !important; } #handCal::before { content: attr(data-ic); font-size: 15px; } }
 /* keyboard / gamepad seen: their keys in the Manual tab */
 .extin { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding: 7px 10px; font-size: 12.5px;

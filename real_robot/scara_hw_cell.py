@@ -33,7 +33,7 @@ Keys in the camera window: SPACE start / pause, 1-4 red/green/blue/yellow (comma
 A any, N none, Q quit.  In --teach mode see the help text on the image.
 """
 import os as _os, sys as _sys  # noqa: E401 - the other folders of this package (common/, mujoco/ ...)
-_sys.path[:0] = [_os.path.join(_os.path.dirname(_os.path.abspath(__file__)), '..', _d)
+_sys.path[:0] = [_os.path.join(_os.path.dirname(_os.path.realpath(__file__)), '..', _d)
                  for _d in ('common', 'mujoco', 'gazebo', 'real_robot', 'server', 'gesture_control')]
 import argparse
 import json

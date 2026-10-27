@@ -31,6 +31,7 @@ run "robot description"          python3 tools/check_description.py
 run "kinematics"                 python3 common/scara_kinematics.py
 run "safety filter"              python3 common/scara_safety.py
 run "robot protocol"             python3 common/scara_twin_protocol.py
+run "hardware bring-up (software robot)" env HOME="$LOG" PYTHONUSERBASE="$(python3 -m site --user-base)" python3 real_robot/scara_bringup.py --fake --yes
 if have_py numpy; then run "gestures (MediaPipe logic)" python3 tools/test_gesture_core.py
 else skip "gestures (MediaPipe logic)" "pip install numpy"; fi
 if command -v g++ >/dev/null; then run "Arduino firmware on the PC" python3 tools/test_firmware_host.py
@@ -41,11 +42,14 @@ if have_py playwright; then
   run "app + website (offline)"   python3 tools/test_app_v3.py --hand-video "$HAND" --shots "$LOG"
   run "app basics"                python3 tools/test_app.py
   run "gesture camera + gamepads"  env SHOTS="$LOG" python3 tools/test_camera_gamepad.py
+  run "3.3 features (paths, programs, belt, demo)" python3 tools/test_new_features.py --shots "$LOG"
+  if have_py cv2; then run "MediaPipe hand tracking (app)" python3 tools/test_gesture_mediapipe.py --shots "$LOG"
+  else skip "MediaPipe hand tracking (app)" "pip install opencv-python"; fi
   if have_py cv2; then run "webcam cell as a twin" python3 tools/test_hw_twin.py --shots "$LOG"
   else skip "webcam cell as a twin" "pip install opencv-python"; fi
 else
   skip "app + website (offline)" "pip install playwright && playwright install chromium"
-  skip "app basics" "playwright"; skip "gesture camera + gamepads" "playwright"; skip "webcam cell as a twin" "playwright"
+  skip "app basics" "playwright"; skip "gesture camera + gamepads" "playwright"; skip "MediaPipe hand tracking (app)" "playwright"; skip "3.3 features (paths, programs, belt, demo)" "playwright"; skip "webcam cell as a twin" "playwright"
 fi
 
 if [ $QUICK = 1 ]; then echo "(--quick: MuJoCo and Gazebo runs left out)"
@@ -56,10 +60,11 @@ else
     run "MuJoCo manual picking"     python3 tools/sim_test_manual.py
     run "MuJoCo sorting cell"     env MODE=sort python3 tools/sim_test_sorting.py
     run "MuJoCo command cell"     env MODE=command python3 tools/sim_test_sorting.py
+    run "MuJoCo belt tracking"    env MODE=command TRACK=1 REQUESTS="red@0,any@40" python3 tools/sim_test_sorting.py
     have_py cv2 && run "webcam cell vs MuJoCo" python3 tools/test_hw_cell.py command \
       || skip "webcam cell vs MuJoCo" "pip install opencv-python"
   else
-    for t in "digital twin (MuJoCo + robot)" "MuJoCo manual picking" "MuJoCo sorting cell" "MuJoCo command cell" "webcam cell vs MuJoCo"; do
+    for t in "digital twin (MuJoCo + robot)" "MuJoCo manual picking" "MuJoCo sorting cell" "MuJoCo command cell" "MuJoCo belt tracking" "webcam cell vs MuJoCo"; do
       skip "$t" "pip install mujoco"; done
   fi
   if command -v ros2 >/dev/null && ros2 pkg prefix scara_description >/dev/null 2>&1; then

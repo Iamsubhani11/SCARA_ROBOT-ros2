@@ -2,6 +2,10 @@
 
 Webcam + MediaPipe, works in **Gazebo** (ROS 2) and **MuJoCo** with the same gestures.
 
+(The phone app and the website have their own MediaPipe hand control since 3.3 – the Gesture button,
+see app/README.md. It works like the joysticks; this program sets the joints directly from where your
+hands are.)
+
 | Hand | Movement | Robot |
 |---|---|---|
 | **Left** (blue) | left / right | base column rotation – the robot faces you, so the arm swings the same way as your hand |

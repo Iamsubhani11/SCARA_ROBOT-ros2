@@ -18,7 +18,7 @@ It listens for a few seconds and checks, in the order things depend on each othe
 Every failed check prints the most likely reason and the fix.
 """
 import os as _os, sys as _sys  # noqa: E401 - the other folders of this package (common/, mujoco/ ...)
-_sys.path[:0] = [_os.path.join(_os.path.dirname(_os.path.abspath(__file__)), '..', _d)
+_sys.path[:0] = [_os.path.join(_os.path.dirname(_os.path.realpath(__file__)), '..', _d)
                  for _d in ('common', 'mujoco', 'gazebo', 'real_robot', 'server', 'gesture_control')]
 import json
 import math

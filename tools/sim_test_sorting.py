@@ -110,6 +110,16 @@ class HarnessIO:
     def move_gripper(self, q, T):
         self._interp([4, 5], [q, q], T)
 
+    def follow(self, points):
+        """belt tracking: arm and gripper together through timed points"""
+        t_prev = 0.0
+        for t, q, g in points:
+            self._interp([0, 1, 2, 3, 4, 5], list(q) + [g, g], max(t - t_prev, 0.02))
+            t_prev = t
+
+    def det_time(self):
+        return self.last_det_t
+
     def set_belt(self, v):
         self.ctrl[6] = v
         self.send_ctrl()
@@ -165,6 +175,8 @@ class HarnessIO:
 def main():
     """
     MODE=sort (default): every colour into its own bin (argv[2] = colours to sort, default all).
+    TRACK=1            : belt tracking (command cell) - the robot follows the moving belt (Jacobian)
+                         instead of stopping it. Also checks that most picks happened on the move.
     MODE=command       : one bin.  REQUESTS is a timed list of commands, like typed / spoken
                          ones, e.g. "red@0,blue@60,any@120,none@170" (seconds of sim time).
                          A colour stays active until the next command.  Checks: every puck in
@@ -188,6 +200,17 @@ def main():
     io.feeder = PuckFeeder(io.get_pos, io.set_pos, seed=seed, max_spawn=n_spawn, log=io.log, mode=mode)
     io.sleep(0.5)
     sorter = Sorter(io, colors, mode=mode)
+    track = os.environ.get('TRACK') == '1'
+    belt_stops = []                                # belt tracking: times the belt was stopped for a pick
+    if track:
+        sorter.set_tracking(True)
+        orig_belt = io.set_belt
+
+        def set_belt(v):
+            if v == 0.0 and io.ctrl[6] != 0.0 and not sorter.holding():
+                belt_stops.append(io.now())        # stopped for a pick (pausing with a puck in the hand is fine)
+            orig_belt(v)
+        io.set_belt = set_belt
     timeline = [(0.0, frozenset())]                # (time, active colours) - command mode
     picks = []                                     # (time, colour, active colours when picked)
 
@@ -197,9 +220,9 @@ def main():
             timeline.append((io.now(), cur))
     orig_pp = sorter.pick_and_place
 
-    def pick_and_place(det):
+    def pick_and_place(det, **kw):
         picks.append((io.now(), det['color'], frozenset(sorter.active)))
-        ok = orig_pp(det)
+        ok = orig_pp(det, **kw)
         note_active()
         return ok
     sorter.pick_and_place = pick_and_place
@@ -269,7 +292,13 @@ def main():
     ok = not bad and len(handled) == io.feeder.spawned == n_spawn
     if mode == 'command':
         ok = ok and len(picks) >= 2
+    if track:                                      # most pucks picked from the moving belt
+        io.log(f'belt tracking: {sorter.tracked} of {len(picks)} picks on the move, belt stopped {len(belt_stops)} times')
+        # command cell (belt tracking is only offered there): most picks on the move, nothing lost
+        need = max(2, 0.6 * len(picks))
+        ok = ok and sorter.tracked >= need and len(belt_stops) <= len(picks) - sorter.tracked
     print(json.dumps({'mode': mode, 'colors': colors, 'seed': seed, 'spawned': io.feeder.spawned,
+                      'tracked': sorter.tracked if track else None, 'belt_stops': len(belt_stops),
                       'handled': len(handled), 'sorted': sorter.sorted, 'failures': sorter.failures,
                       'wrong': bad, 'PASS': ok}))
     if video:

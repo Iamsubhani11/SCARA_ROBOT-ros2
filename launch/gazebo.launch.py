@@ -20,13 +20,15 @@ Arguments
   show       true|false   OpenCV camera windows                     (default true)
   rviz       true|false   RViz with the robot and the cell          (default false)
   headless   true|false   no Gazebo window, server only (cameras still render) (default false)
+  track_belt true|false   command cell: pick from the moving belt (belt tracking) (default false)
+  stop_old   true|false   stop a SCARA Gazebo still running from an earlier start (default true)
 """
 import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import (AppendEnvironmentVariable, DeclareLaunchArgument, IncludeLaunchDescription,
-                            RegisterEventHandler, TimerAction)
+                            OpaqueFunction, RegisterEventHandler, TimerAction)
 from launch.conditions import IfCondition
 from launch.event_handlers import OnProcessExit
 from launch.launch_description_sources import PythonLaunchDescriptionSource
@@ -43,6 +45,35 @@ def plugin_dirs():
              os.path.expanduser('~/gz_ros2_control_ws/install/gz_ros2_control/lib'),
              os.path.expanduser('~/ros2_ws/install/gz_ros2_control/lib')]
     return os.pathsep.join(c for c in cands if os.path.isdir(c)) or f'/opt/ros/{distro}/lib'
+
+
+def stop_leftovers(context):
+    """A SCARA Gazebo left running by an earlier start (a closed terminal, a crash) keeps its own
+    /controller_manager and clock: the new arm then gets no controllers and seems to "crash".
+    Stop it first (stop_old:=false keeps it)."""
+    import signal
+    import subprocess
+    import time
+    if LaunchConfiguration('stop_old').perform(context) != 'true':
+        return []
+    me = os.getpgrp()
+    out = subprocess.run(['pgrep', '-f', r'gz sim.*scara_(world|command_world|manual_world)\.sdf'],
+                         capture_output=True, text=True).stdout.split()
+    old = [int(p) for p in out if p.isdigit() and os.getpgid(int(p)) != me]
+    if old:
+        print(f'[gazebo.launch] a SCARA Gazebo from an earlier start is still running (pid {old}) - stopping it first')
+        for p in old:
+            try:
+                os.kill(p, signal.SIGTERM)
+            except ProcessLookupError:
+                pass
+        time.sleep(3.0)
+        for p in old:
+            try:
+                os.kill(p, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+    return []
 
 
 def name_plate(pkg):
@@ -104,7 +135,9 @@ def generate_launch_description():
 
     def spawner(name):
         return Node(package='controller_manager', executable='spawner', output='screen',
-                    arguments=[name, '--controller-manager', '/controller_manager'])
+                    # 60 s: the first start of Gazebo can be slow; the default timeout left the arm
+                    # without controllers ("Gazebo crashed")
+                    arguments=[name, '--controller-manager', '/controller_manager', '--controller-manager-timeout', '60'])
 
     controllers = RegisterEventHandler(OnProcessExit(
         target_action=spawn_robot,
@@ -115,6 +148,7 @@ def generate_launch_description():
     color_sorter = Node(package='scara_description', executable='scara_color_sorter.py', output='screen',
                         condition=IfCondition(cell),
                         parameters=[{'use_sim_time': True, 'mode': mode,
+                                     'track_belt': PythonExpression(["'", LaunchConfiguration('track_belt'), "' == 'true'"]),
                                      'bin_capacity': PythonExpression(["0 if '", empty_bins, "' == 'true' else int('", capacity, "')"])}])
     puck_spawner = Node(package='scara_description', executable='scara_puck_spawner.py', output='screen',
                         condition=IfCondition(cell),
@@ -137,6 +171,10 @@ def generate_launch_description():
         DeclareLaunchArgument('show', default_value='true'),
         DeclareLaunchArgument('rviz', default_value='false'),
         DeclareLaunchArgument('headless', default_value='false', description='true = no Gazebo window'),
+        DeclareLaunchArgument('stop_old', default_value='true', description='stop a SCARA Gazebo still running from before'),
+        OpaqueFunction(function=stop_leftovers),
+        DeclareLaunchArgument('track_belt', default_value='false',
+                              description='true = command cell picks from the moving belt (belt tracking)'),
         AppendEnvironmentVariable('GZ_SIM_RESOURCE_PATH', install_share),
         AppendEnvironmentVariable('IGN_GAZEBO_RESOURCE_PATH', install_share),
         AppendEnvironmentVariable('GZ_SIM_SYSTEM_PLUGIN_PATH', plugin_dirs()),

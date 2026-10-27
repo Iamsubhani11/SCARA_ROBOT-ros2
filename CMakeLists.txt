@@ -51,6 +51,7 @@ install(
     real_robot/scara_cam2d.py
     real_robot/scara_camera_setup.py
     real_robot/scara_hw_cell.py
+    real_robot/scara_bringup.py
     gazebo/scara_pose_relay.py
     gesture_control/gesture_core.py
     gesture_control/gesture_control_mujoco.py

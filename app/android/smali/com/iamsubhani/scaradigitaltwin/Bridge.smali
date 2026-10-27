@@ -17,7 +17,7 @@
     .registers 2
     .annotation runtime Landroid/webkit/JavascriptInterface;
     .end annotation
-    const-string v0, "3.1.0"
+    const-string v0, "3.3.0"
     return-object v0
 .end method
 

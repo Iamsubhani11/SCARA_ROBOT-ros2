@@ -33,7 +33,7 @@ Commands (typed or spoken): a colour (stays active until the next), "any", "none
 "stop" / "start" (belt), "empty bins".
 """
 import os as _os, sys as _sys  # noqa: E401 - the other folders of this package (common/, mujoco/ ...)
-_sys.path[:0] = [_os.path.join(_os.path.dirname(_os.path.abspath(__file__)), '..', _d)
+_sys.path[:0] = [_os.path.join(_os.path.dirname(_os.path.realpath(__file__)), '..', _d)
                  for _d in ('common', 'mujoco', 'gazebo', 'real_robot', 'server', 'gesture_control')]
 import argparse
 import math
@@ -195,6 +195,17 @@ class MujocoIO:
     def move_gripper(self, q, T):
         self._interp(['act_left_finger', 'act_right_finger'], [q, q], T)
 
+    def follow(self, points):
+        """Belt tracking: arm and gripper together through timed points [(t, [col, z, fore, wrist], g)]."""
+        keys = ['act_column', 'act_shoulder', 'act_forearm', 'act_wrist', 'act_left_finger', 'act_right_finger']
+        t_prev = 0.0
+        for t, q, g in points:
+            self._interp(keys, list(q) + [g, g], max(t - t_prev, 0.02))
+            t_prev = t
+
+    def det_time(self):
+        return self.last_det_t
+
     def set_belt(self, v):
         self.ctrl['act_belt'] = v
 
@@ -311,6 +322,9 @@ class CellBackend:
 
     def request(self, text):
         from scara_voice import parse_command
+        if str(text).lower().startswith('track'):        # belt tracking on / off
+            self.cmds.append(str(text).lower())
+            return True
         cmd = parse_command(text) or ('all' if text in ('any', 'next') else None)
         if cmd:
             self.cmds.append(cmd)
@@ -328,16 +342,18 @@ class CellBackend:
             return {}
         return {'cell_mode': self.mode, 'active': self.sorter.requests, 'count_left': self.sorter.count_left,
                 'sequence': self.sorter.sequence,
-                'sorted': self.sorter.sorted}
+                'sorted': self.sorter.sorted, 'tracking': self.sorter.track_belt, 'tracked': self.sorter.tracked}
 
 
 def run_cell(model, data, mode, show=False, voice=False, llm=False, stt='auto', keep=False, capacity=0,
-             seed=None, twin=None, gui=False, backend=None, should_exit=None, open_browser=False):
+             seed=None, twin=None, gui=False, backend=None, should_exit=None, open_browser=False, track=False):
     """mode 'sort' (4 bins, sorts everything) or 'command' (1 bin, picks what you ask for).
     backend / should_exit: used by scara_twin_server.py when the app switches MuJoCo worlds."""
     import collections
     import threading
     commands = backend.cmds if backend is not None else collections.deque()
+    if track:
+        commands.append('track on')              # --track-belt: follow the belt instead of stopping it
     paused = False                               # 'stop' / 'start' commands stop / start the belt
     if mode == 'command' and backend is None:
         from scara_voice import VoiceAssistant, start_console
@@ -388,6 +404,8 @@ def run_cell(model, data, mode, show=False, voice=False, llm=False, stt='auto', 
                     elif cmd.startswith('empty'):
                         sorter.empty_bins(cmd.split()[1:] or None)
                         io.empty_bins(cmd.split()[1:] or None)
+                    elif cmd.startswith('track'):         # belt tracking on / off (app, website, --track-belt)
+                        sorter.request(cmd)
                     elif mode == 'command':
                         sorter.request('any' if cmd == 'all' else cmd)
                         paused = False
@@ -419,6 +437,8 @@ def main():
     ap.add_argument('--seed', type=int, default=None, help='random seed for the puck order')
     ap.add_argument('--twin', default=None, help='digital twin: serial port of the real robot, or "fake"')
     ap.add_argument('--twin-homing', default='switches', choices=['switches', 'zero', 'none'])
+    ap.add_argument('--track-belt', action='store_true',
+                    help='belt tracking: pick pucks from the moving belt (Jacobian) instead of stopping it')
     args, _ = ap.parse_known_args()
     mode = 'command' if (args.command or args.voice or args.ask) else ('sort' if args.auto else 'manual')
     if mode == 'manual' and args.gui:
@@ -436,7 +456,7 @@ def main():
     else:
         run_cell(model, data, mode, args.show, args.voice, args.llm, args.stt,
                  keep=args.keep_in_bins, capacity=args.capacity, seed=args.seed, twin=twin, gui=args.gui,
-                 open_browser=args.open)
+                 open_browser=args.open, track=args.track_belt)
 
 
 if __name__ == '__main__':

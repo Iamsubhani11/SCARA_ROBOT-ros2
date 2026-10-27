@@ -122,7 +122,10 @@ async def browser(port, shots):
 def main(a):
     home = tempfile.mkdtemp(prefix='scara_hw_twin_')
     pick, u = setup(home)
-    env = dict(os.environ, HOME=home)
+    # bug 33: a new HOME hides the packages installed with "pip install --user" (mujoco, cv2 ...),
+    # so keep pointing Python at the real user folder
+    import site
+    env = dict(os.environ, HOME=home, PYTHONUSERBASE=site.getuserbase())
     http, app = 8291, 9291
     proc = subprocess.Popen([sys.executable, os.path.join(ROOT, 'server', 'scara_twin_server.py'), '--sim', 'hardware',
                              '--fake', '--no-browser', '--http', str(http), '--app-port', str(app)],

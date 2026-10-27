@@ -28,7 +28,7 @@ Parameters: mode (sort | command), belt_sign (+1/-1), bin_capacity (0 = bins emp
     ros2 topic pub --once /scara/pick_color std_msgs/msg/String "{data: 'red'}"
 """
 import os as _os, sys as _sys  # noqa: E401 - the other folders of this package (common/, mujoco/ ...)
-_sys.path[:0] = [_os.path.join(_os.path.dirname(_os.path.abspath(__file__)), '..', _d)
+_sys.path[:0] = [_os.path.join(_os.path.dirname(_os.path.realpath(__file__)), '..', _d)
                  for _d in ('common', 'mujoco', 'gazebo', 'real_robot', 'server', 'gesture_control')]
 import json
 import math
@@ -63,6 +63,7 @@ class SorterNode(Node):
         self.declare_parameter('colors', 'all')
         self.declare_parameter('belt_sign', 1.0)
         self.declare_parameter('bin_capacity', 0)      # 0 = bins are emptied automatically (spawner clear_bins)
+        self.declare_parameter('track_belt', False)    # command cell: pick from the moving belt (Jacobian)
         cb = ReentrantCallbackGroup()
         self.arm = ActionClient(self, FollowJointTrajectory, '/arm_controller/follow_joint_trajectory', callback_group=cb)
         self.grip = ActionClient(self, FollowJointTrajectory, '/gripper_controller/follow_joint_trajectory', callback_group=cb)
@@ -86,6 +87,8 @@ class SorterNode(Node):
         self.create_timer(0.1, self.publish_belt, callback_group=cb)
         self.sorter = Sorter(self, self.get_parameter('colors').value,
                              bin_capacity=int(self.get_parameter('bin_capacity').value), mode=self.mode)
+        if bool(self.get_parameter('track_belt').value):
+            self.sorter.set_tracking(True)
 
     # ------------------------------------------------------------ callbacks
     def on_js(self, msg):
@@ -95,13 +98,19 @@ class SorterNode(Node):
     def on_dets(self, msg):
         try:
             self.dets = json.loads(msg.data)
-            self.dets_stamp = self.now()
+            # the camera's own time stamp when the vision node sends it (belt tracking needs it), else now
+            ts = [d['t'] for d in self.dets if isinstance(d, dict) and d.get('t')]
+            self.dets_stamp = ts[0] if ts else self.now()
         except ValueError:
             pass
         self._check_belt_direction()
 
     def on_cmd(self, msg):
-        """Commands on /scara/pick_color: a colour / "any" (command mode), "stop", "start", "empty"."""
+        """Commands on /scara/pick_color: a colour / "any" (command mode), "stop", "start", "empty",
+        "track on" / "track off" (belt tracking)."""
+        if msg.data.strip().lower().startswith('track'):
+            self.pending.append(msg.data.strip().lower())       # handled by the worker (Sorter.request)
+            return
         cmd = parse_command(msg.data)
         if cmd is None and msg.data.strip().lower() in ('any', 'anything', 'next'):
             cmd = 'all'
@@ -126,7 +135,7 @@ class SorterNode(Node):
         so = self.sorter
         self.state_pub.publish(String(data=json.dumps({
             'mode': self.mode, 'active': so.requests, 'count_left': so.count_left, 'sequence': so.sequence,
-            'sorted': so.sorted,
+            'sorted': so.sorted, 'tracking': so.track_belt, 'tracked': so.tracked,
             'running': self.running, 'belt': self.belt_cmd, 'failures': so.failures})))
 
     def publish_belt(self):
@@ -200,6 +209,36 @@ class SorterNode(Node):
 
     def move_gripper(self, q, T):
         self._run_traj(self.grip, S.GRIPPER_JOINTS, [q, q], T)
+
+    def follow(self, points):
+        """Belt tracking: arm and gripper together through timed points [(t, [col, z, fore, wrist], g)].
+        Sent as ONE trajectory per controller (both at the same time), so the arm does not stop at
+        every point the way separate move_arm() calls would."""
+        def goal(names, rows):
+            g = FollowJointTrajectory.Goal()
+            g.trajectory.joint_names = list(names)
+            for t, pos in rows:
+                pt = JointTrajectoryPoint()
+                pt.positions = [float(p) for p in pos]
+                pt.time_from_start = to_duration(t)
+                g.trajectory.points.append(pt)
+            return g
+        T = points[-1][0]
+        futs = [self.arm.send_goal_async(goal(S.ARM_JOINTS, [(t, q) for t, q, _ in points])),
+                self.grip.send_goal_async(goal(S.GRIPPER_JOINTS, [(t, [g, g]) for t, _, g in points]))]
+        wall_end = time.time() + 10.0
+        while not all(f.done() for f in futs) and time.time() < wall_end:
+            time.sleep(0.005)
+        if not all(f.done() and f.result().accepted for f in futs):
+            self.get_logger().error('belt tracking: trajectory refused - is the controller active?')
+            return
+        res = [f.result().get_result_async() for f in futs]
+        wall_end = time.time() + T * 20 + 10.0
+        while not all(r.done() for r in res) and time.time() < wall_end:
+            time.sleep(0.005)
+
+    def det_time(self):
+        return self.dets_stamp
 
     def set_belt(self, v):
         self.belt_cmd = v

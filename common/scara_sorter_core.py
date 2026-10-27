@@ -14,11 +14,18 @@ everywhere:
     io.joints() -> dict                    current joint positions
     io.detections() -> list                latest pucks seen on the belt
     io.log(text)
+
+Optional, for belt tracking (the belt keeps running while the robot picks):
+    io.follow(points)                      points = [(t, [col, z, fore, wrist], gripper), ...] with t in s
+                                           from now: arm AND gripper go through them together, in time
+    io.det_time() -> float                 when the latest detections were taken (camera time stamp)
+An IO without follow() simply stops the belt for every pick, as before.
 """
 import os as _os, sys as _sys  # noqa: E401 - the other folders of this package (common/, mujoco/ ...)
-_sys.path[:0] = [_os.path.join(_os.path.dirname(_os.path.abspath(__file__)), '..', _d)
+_sys.path[:0] = [_os.path.join(_os.path.dirname(_os.path.realpath(__file__)), '..', _d)
                  for _d in ('common', 'mujoco', 'gazebo', 'real_robot', 'server', 'gesture_control')]
 import math
+import os
 
 try:
     import scara_scene as S
@@ -29,6 +36,46 @@ except ImportError:
 
 MAX_SPEED = {'column_joint': 0.9, 'shoulder_joint': 0.08, 'forearm_joint': 0.9, 'wrist_joint': 1.2}
 PASS_CLEARANCE = 0.08          # a skipped puck must move this far past the pick window
+# belt tracking: the arm meets the puck while it rides on the belt, follows it down, grabs and lifts
+TRACK_MEET_S = -0.12           # belt position where the arm meets the puck (reach on the belt: -0.16 .. 0.16)
+TRACK_LATEST_S = -0.06         # a puck already past this when we could meet it: stop the belt as before
+TRACK_DOWN, TRACK_CLOSE, TRACK_UP = 1.0, 1.0, 0.8     # s: go down, close (and wait), lift - all on the move
+# the arm meets the puck just above its handle, so Z has only ~7 cm to go down in TRACK_DOWN
+# (0.07 m/s - inside the 0.08 m/s Z speed limit; from travel height it would need 0.17 m/s)
+
+
+class BeltSpeed:
+    """The real belt speed, measured by the camera: every puck on the belt moves with it, so each puck
+    seen again a little further on gives one measurement (same colour, same side of the belt, moved
+    forward). The median of the recent ones is the speed - one bad detection cannot spoil it.
+    A real belt (and Gazebo's) does not run at exactly the speed it is told: 10 % off is 2 cm over
+    one pick, more than the 10 mm of room the fingers have."""
+
+    def __init__(self, keep=40):
+        self.prev, self.prev_t, self.v, self.keep = [], None, [], keep
+
+    def reset(self):
+        self.prev, self.prev_t = [], None             # the belt stopped: pucks speed up again from rest
+
+    def update(self, dets, t):
+        if self.prev_t is not None and t - self.prev_t >= 0.12:
+            dt = t - self.prev_t
+            for d in dets:
+                for p in self.prev:
+                    ds = d['s'] - p['s']
+                    if (d['color'] == p['color'] and 0.0 < ds < 0.25 * dt + 0.01
+                            and abs(S.belt_lat(d['x'], d['y']) - S.belt_lat(p['x'], p['y'])) < 0.015):
+                        self.v.append(ds / dt)
+                        break
+            self.v = self.v[-self.keep:]
+        if self.prev_t is None or t - self.prev_t >= 0.12:
+            self.prev, self.prev_t = [dict(d) for d in dets], t
+
+    def speed(self, n_min=4):
+        if len(self.v) < n_min:
+            return None
+        v = sorted(self.v)[len(self.v) // 2]
+        return min(max(v, 0.5 * S.BELT_SPEED), 2.0 * S.BELT_SPEED)
 
 
 def move_time(q_from, q_to, t_min=0.6):
@@ -73,6 +120,9 @@ class Sorter:
         self.bin_capacity = int(bin_capacity or 0)
         self.in_bin = {c: 0 for c in S.COLOR_ORDER}
         self._full_warned = set()
+        self.track_belt = False             # True: follow the running belt instead of stopping it (needs io.follow)
+        self.tracked = 0                    # picks done without stopping the belt
+        self.belt = BeltSpeed()             # belt tracking: the belt speed as the camera measures it
 
     def bin_full(self, color):
         if self.mode == 'command':
@@ -101,6 +151,9 @@ class Sorter:
         if isinstance(colors, str):
             colors = colors.replace(',', ' ').split()
         words = [c.strip().lower() for c in colors]
+        if words[:1] == ['track'] or words[:2] == ['follow', 'belt']:     # "track on" / "track off"
+            self.set_tracking(words[-1] not in ('off', 'stop', 'no', '0'))
+            return self.requests
         if words and (words[0] in ('sequence', 'seq', 'order', 'then') or 'then' in words):
             return self._sequence([w for w in words if w not in ('sequence', 'seq', 'order', 'then', 'and')])
         self.queue = []
@@ -131,6 +184,21 @@ class Sorter:
         self.io.log(f'Now picking {what}' + (f' ({self.count_left} pucks)' if self.count_left
                                              else ' until you give the next colour'))
         return self.requests
+
+    def set_tracking(self, on):
+        """Belt tracking on / off. Only works when the simulator can move arm and gripper together
+        along a timed path (io.follow); the real camera cell keeps stopping the belt."""
+        if on and not hasattr(self.io, 'follow'):
+            self.io.log('Belt tracking needs a simulator (MuJoCo or Gazebo) - here the belt stops for every pick')
+            on = False
+        if on and self.mode != 'command':
+            # tested: in the sorting cell every puck is wanted and they come every 2.5 s - chasing one
+            # lets the next ones ride off the belt. Stopping the belt is the better plan there.
+            self.io.log('Belt tracking is for the command cell (a few wanted pucks); sorting keeps stopping the belt')
+            on = False
+        self.track_belt = bool(on)
+        self.io.log('Belt tracking ON: the robot follows the moving belt instead of stopping it' if on
+                    else 'Belt tracking off: the belt stops for every pick')
 
     def _sequence(self, words):
         seq, rep = [], 1
@@ -273,16 +341,90 @@ class Sorter:
         self.move_to(x, y, S.Z_TRAVEL, t_min=0.8, yaw=self.gripper_yaw(), symmetry=math.pi / 2)
         self.gripper_open()
 
-    def pick_and_place(self, det):
+    def track_plan(self, det, t_det, speed=None):
+        """The timed path for grabbing a puck that rides on the running belt, or None if it cannot
+        be done (puck too far on, a joint would hit its limit, too close to a singularity).
+
+        The puck moves in a straight line at the belt speed, so we know where it will be:
+            p(t) = p_seen + v_belt * (t - t_seen)
+        1. pick a meeting point on the belt and the time the arm needs to get above it
+        2. from there follow the puck with the Jacobian (scara_kinematics.track_line) while going
+           down, closing the gripper and lifting - all at the speed of the belt
+        speed: the belt speed MEASURED by the camera (m/s); a real belt (and Gazebo's) does not run at
+        exactly the speed it is told - 10 % off is 2 cm over a pick, more than the fingers' room"""
+        io = self.io
+        sp = speed or S.BELT_SPEED
+        v = (S.BELT_DIR[0] * sp, S.BELT_DIR[1] * sp)
+        now = io.now()
+        s_now = det['s'] + sp * (now - t_det)
+        cur = self._current_arm()
+        s_meet, q_above, t_go = max(TRACK_MEET_S, s_now + 0.3 * sp), None, 0.0
+        for _ in range(4):                         # meeting point <-> time to get there, a few rounds
+            dt = (s_meet - s_now) / sp
+            px, py = det['x'] + v[0] * (now + dt - t_det), det['y'] + v[1] * (now + dt - t_det)
+            try:
+                q_above = K.arm_pose(px, py, S.Z_TRAVEL, prefer=(cur[0], cur[2]))
+            except K.IKError:
+                return None
+            t_go = move_time(cur, q_above)
+            s_meet = max(s_meet, s_now + sp * t_go)
+        if s_meet > TRACK_LATEST_S:
+            return None
+        t_meet = (s_meet - s_now) / sp            # from now; >= t_go: the arm is early or just in time
+        p_meet = (det['x'] + v[0] * (now + t_meet - t_det), det['y'] + v[1] * (now + t_meet - t_det))
+        T = TRACK_DOWN + TRACK_CLOSE + TRACK_UP
+        try:
+            path = K.track_line(q_above[0], q_above[2], p_meet, v, T, dt=0.1)
+        except K.IKError:
+            return None
+        z_pick = S.z_pick_on(S.BELT_TOP_Z)
+        z_pre = S.z_for_pad_bottom(S.BELT_TOP_Z + S.HANDLE_TOP_Z + 0.015)    # just above the handles
+        # 1. over the meeting point at travel height (the arm comes from beside the belt), 2. down to
+        # just above the handles while the puck arrives, then follow it: down, close, lift
+        t_pre = max(0.4 * t_meet, t_meet - 1.0)
+        pts = [(t_pre, [q_above[0], S.Z_TRAVEL, q_above[2], 0.0], S.GRIP_PREGRASP),
+               (t_meet, [q_above[0], z_pre, q_above[2], 0.0], S.GRIP_PREGRASP)]
+        for t, a, b in path[1:]:
+            if t <= TRACK_DOWN:
+                z, g = z_pre + (z_pick - z_pre) * t / TRACK_DOWN, S.GRIP_PREGRASP
+            elif t <= TRACK_DOWN + TRACK_CLOSE:
+                k = min(1.0, (t - TRACK_DOWN) / 0.7)
+                z, g = z_pick, S.GRIP_PREGRASP + (S.GRIP_CLOSE - S.GRIP_PREGRASP) * k
+            else:
+                z, g = z_pick + (S.Z_TRAVEL - z_pick) * (t - TRACK_DOWN - TRACK_CLOSE) / TRACK_UP, S.GRIP_CLOSE
+            pts.append((t_meet + t, [a, z, b, 0.0], g))
+        return pts
+
+    def track_pick(self, det, t_det, speed=None):
+        """Grab the puck without stopping the belt. Returns True holding, False missed, None not possible."""
+        pts = self.track_plan(det, t_det, speed)
+        if pts is None:
+            return None
+        self.io.log(f'Following the belt to pick the {det["color"]} puck (belt keeps running)')
+        self.io.follow(pts)
+        if not self.holding():
+            self.io.log(f'Missed the {det["color"]} puck on the moving belt - will look again')
+            self.gripper_open()
+            self.failures += 1
+            return False
+        self.tracked += 1
+        return True
+
+    def pick_and_place(self, det, held=False):
         color = det['color']
         # the puck is round and fits between the open fingers: any approach direction works
         yaw = None
-        self.io.log(f'Picking {color} puck at x={det["x"]:+.3f} y={det["y"]:+.3f}')
-        if not self.pick_at(det['x'], det['y'], yaw, S.BELT_TOP_Z, f'{color} puck'):
-            return False
+        if not held:
+            self.io.log(f'Picking {color} puck at x={det["x"]:+.3f} y={det["y"]:+.3f}')
+            if not self.pick_at(det['x'], det['y'], yaw, S.BELT_TOP_Z, f'{color} puck'):
+                return False
         # back off the belt towards the robot first, so the carried puck never
         # sweeps over the pucks waiting upstream
-        rx, ry = S.belt_point(S.belt_s(det['x'], det['y']), -S.BELT_WIDTH / 2)
+        bx0, by0 = det['x'], det['y']
+        if held:                                   # tracked pick: the puck has ridden on since it was seen
+            q = self._current_arm()
+            bx0, by0 = K.fk_xy(q[0], q[2], q[3])
+        rx, ry = S.belt_point(S.belt_s(bx0, by0), -S.BELT_WIDTH / 2)
         try:
             self.move_to(rx, ry, S.Z_TRAVEL, yaw=self.gripper_yaw(), symmetry=math.pi / 2)
         except K.IKError:
@@ -314,6 +456,10 @@ class Sorter:
         io = self.io
         t0 = io.now()
         io.set_belt(S.BELT_SPEED)
+        if self.track_belt and hasattr(io, 'follow'):
+            r = self._track_step(timeout)
+            if r is not None:
+                return r                          # None: this puck came too late to follow - stop the belt for it
         lo, hi = S.PICK_WINDOW_S[0], S.PICK_WINDOW_S[1] + PASS_CLEARANCE - 0.01
         warned = set()
         while io.now() - t0 < timeout:
@@ -340,3 +486,59 @@ class Sorter:
         ok = self.pick_and_place(target)
         self.go_ready()
         return 'picked' if ok else 'missed'
+
+    def go_wait(self):
+        """Belt tracking: wait at travel height just beside the belt (robot side) near the meeting
+        point, so the arm is there quickly when a puck arrives (from the ready pose it takes ~2.5 s).
+        Not above the belt: from there the arm hides the coming pucks from the camera."""
+        x, y = S.belt_point(TRACK_MEET_S + 0.06, -(S.BELT_WIDTH / 2 + 0.02))
+        cur = self._current_arm()
+        q = K.arm_pose(x, y, S.Z_TRAVEL, prefer=(cur[0], cur[2]))
+        if max(abs(a - b) for a, b in zip(q, cur)) > 0.02:
+            self.move_to(x, y, S.Z_TRAVEL)
+
+    def _track_step(self, timeout):
+        """Belt tracking: wait (belt running) for a wanted puck upstream, then pick it on the move.
+        Returns 'picked' / 'missed' / 'idle', or None when the puck is already too far on to follow."""
+        io = self.io
+        self.go_wait()
+        t0 = io.now()
+        self.belt.reset()                          # the belt was paused (arm at the bin) - measure from now on
+        while io.now() - t0 < timeout:
+            dets = io.detections()
+            t_det = io.det_time() if hasattr(io, 'det_time') else io.now()
+            if io.now() - t0 > 0.6:                # the belt is up to speed again
+                self.belt.update(dets, t_det)
+            # a wanted puck already too far on to follow (the belt froze it there while the arm was at
+            # the bin) is still in the normal pick window: stop the belt and take it first
+            late = [d for d in dets if self.wants(d['color']) and self._in_reach(d) and d['s'] >= TRACK_LATEST_S]
+            if late:
+                return None
+            cands = [d for d in dets if self.wants(d['color']) and d['s'] < TRACK_LATEST_S]
+            # follow the belt only for a wanted puck that comes alone (tested: when wanted pucks crowd
+            # together, chasing one lets another ride off the belt) - otherwise stop the belt as before
+            if len([d for d in dets if self.wants(d['color']) and d['s'] > -0.55]) > 1:
+                return None
+            if cands:
+                target = max(cands, key=lambda d: d['s'])     # the one that leaves the reach first
+                speed = self.belt.speed()
+                if speed is None and target['s'] < TRACK_MEET_S - 0.06:
+                    io.sleep(0.05)                 # far enough upstream: let the camera measure the belt first
+                    continue
+                if os.environ.get('DEBUG_TRACK'):
+                    io.log(f'track: s={target["s"]:+.3f} measured belt speed {speed} ({len(self.belt.v)} measurements)')
+                got = self.track_pick(target, t_det, speed)
+                if got is None:
+                    if target['s'] > TRACK_MEET_S - 0.02:
+                        return None                          # too far on: the normal (stopping) pick takes it
+                    io.sleep(0.05)
+                    continue
+                if got:
+                    # the pick itself was on the move; the trip to the bin and back is long (~15 s), so
+                    # the belt pauses while the arm is away - otherwise the next pucks would ride off
+                    io.set_belt(0.0)
+                    self.pick_and_place(target, held=True)
+                self.go_wait()
+                return 'picked' if got else 'missed'
+            io.sleep(0.05)
+        return 'idle'

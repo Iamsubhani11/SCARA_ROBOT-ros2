@@ -13,7 +13,7 @@ Shows two OpenCV windows like the Mechamind Labs videos:
 No cv_bridge needed - images are converted with NumPy.
 """
 import os as _os, sys as _sys  # noqa: E401 - the other folders of this package (common/, mujoco/ ...)
-_sys.path[:0] = [_os.path.join(_os.path.dirname(_os.path.abspath(__file__)), '..', _d)
+_sys.path[:0] = [_os.path.join(_os.path.dirname(_os.path.realpath(__file__)), '..', _d)
                  for _d in ('common', 'mujoco', 'gazebo', 'real_robot', 'server', 'gesture_control')]
 import json
 
@@ -75,6 +75,7 @@ class VisionNode(Node):
 
     def on_rgb(self, msg):
         self.rgb = image_to_numpy(msg)
+        self.rgb_t = msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9   # when the camera took it (sim time)
 
     def on_depth(self, msg):
         self.depth = image_to_numpy(msg)
@@ -99,7 +100,11 @@ class VisionNode(Node):
             return
         dets = V.detect_pucks(self.rgb, self.depth, self.cam)
         # 's' (position along the belt) is what the sorter and the spawner work with - it must be in the message
-        out = [{k: d[k] for k in ('color', 'x', 'y', 'z', 's', 'yaw', 'u', 'v', 'depth', 'area')} for d in dets]
+        # 't': when the picture was taken - belt tracking predicts where the puck is NOW from it
+        # (the message arrives later than the picture; at 0.08 m/s even 0.15 s is 12 mm)
+        t = getattr(self, 'rgb_t', None)
+        out = [dict({k: d[k] for k in ('color', 'x', 'y', 'z', 's', 'yaw', 'u', 'v', 'depth', 'area')}, **({'t': t} if t else {}))
+               for d in dets]
         self.pub.publish(String(data=json.dumps(out)))
         if self.show:
             cv2.imshow('Fixed Camera Box Detector', V.draw_detections(self.rgb, dets))

@@ -191,6 +191,44 @@ def main():
     installed = {os.path.basename(p) for p in progs}
     check(exes <= installed, f'every program a launch file starts is installed {sorted(exes - installed)}')
 
+    # ---- bug 36: after "colcon build --symlink-install" every program is a symlink in install/.../lib;
+    # Python then starts in the real folder (gazebo/ ...), so the shared modules must be found from there
+    hack = [f for f in py_files() if "'..', _d)" in open(f).read()]
+    bad = [os.path.basename(f) for f in hack if 'realpath(__file__)' not in open(f).read()]
+    check(len(hack) >= 25 and not bad, f'{len(hack)} programs find common/ etc. through a symlink (realpath) {bad}')
+    import subprocess
+    with tempfile.TemporaryDirectory() as tmp:
+        link = os.path.join(tmp, 'gesture_core.py')
+        os.symlink(os.path.join(ROOT, 'gesture_control', 'gesture_core.py'), link)
+        r2 = subprocess.run([sys.executable, link], capture_output=True, text=True, cwd=tmp)
+        check(r2.returncode == 0 and 'ModuleNotFoundError' not in r2.stderr,
+              f'a symlinked program (like a colcon --symlink-install) still imports scara_scene {r2.stderr[-160:]!r}')
+
+    # ---- bug 37: "Gazebo crashed" = the arm got no controllers (spawner timed out on a slow start, or a
+    # Gazebo left from an earlier start still held /controller_manager)
+    gl = open(os.path.join(ROOT, 'launch', 'gazebo.launch.py')).read()
+    check("'--controller-manager-timeout', '60'" in gl and 'OpaqueFunction(function=stop_leftovers)' in gl
+          and "DeclareLaunchArgument('stop_old'" in gl,
+          'Gazebo launch: spawners wait 60 s and an old SCARA Gazebo is stopped first')
+
+    # ---- one version everywhere (the Android bridge said 3.1.0 for two releases)
+    ver = re.search(r"^VERSION = '([\d.]+)'", open(os.path.join(ROOT, 'tools', 'build_app.py')).read(), re.M).group(1)
+    yml = open(os.path.join(ROOT, 'app', 'android', 'apktool.yml')).read()
+    br = open(os.path.join(ROOT, 'app', 'android', 'smali', 'com', 'iamsubhani', 'scaradigitaltwin', 'Bridge.smali')).read()
+    pk = open(os.path.join(ROOT, 'package.xml')).read()
+    check(f'versionName: {ver}' in yml and f'const-string v0, "{ver}"' in br and f'<version>{ver}</version>' in pk,
+          f'version {ver} in build_app.py, apktool.yml, the Android bridge and package.xml')
+
+    # ---- bug 33: a test that gives the server a new HOME must keep the "pip install --user" packages
+    bad = [os.path.basename(f) for f in glob.glob(os.path.join(ROOT, 'tools', '*.py'))
+           if re.search(r'HOME=', open(f).read()) and 'PYTHONUSERBASE' not in open(f).read() and not f.endswith('test_static.py')]
+    check(not bad, f'tests with their own HOME still find pip --user packages {bad}')
+
+    # ---- bug 35: tilt drive must not give up when requestPermission() fails (Android needs no permission)
+    js = open(os.path.join(ROOT, 'app', 'ui', 'app.js')).read()
+    tilt = js[js.find("on('tilt'"):][:1200]
+    check("r === 'denied'" in tilt and '.catch(() => go())' in tilt, 'tilt drive starts unless the permission is clearly denied')
+
     print('ALL STATIC CHECKS PASSED' if not FAIL else f'{len(FAIL)} FAILED')
     return 1 if FAIL else 0
 

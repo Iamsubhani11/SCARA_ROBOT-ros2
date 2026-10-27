@@ -117,7 +117,10 @@ async def browser_pucks():
 def main():
     import tempfile
     home = tempfile.mkdtemp(prefix='scara_twin_e2e_')       # the direction check saves here, not in your home
-    env = dict(os.environ, HOME=home)
+    # bug 33: a new HOME hides the packages installed with "pip install --user" (mujoco, cv2 ...),
+    # so keep pointing Python at the real user folder
+    import site
+    env = dict(os.environ, HOME=home, PYTHONUSERBASE=site.getuserbase())
     log = open(os.path.join(os.environ.get('SHOTS', '/tmp'), 'twin_e2e_server.log'), 'w')
     proc = subprocess.Popen([sys.executable, os.path.join(ROOT, 'server', 'scara_twin_server.py'), '--sim', 'mujoco',
                              '--fake', '--http', str(HTTP), '--app-port', str(APP)], env=env, stdout=log,
@@ -182,6 +185,18 @@ def main():
         st = state()
         check(st['robot'].get('conveyor_on') is True, f'conveyor relay on at the robot ({st["robot"].get("conveyor_on")})')
         cmd('conveyor', run=False)
+        # ---- 3.3 programs: a whole list of poses at once (Load / Import), clamped to the limits, saved on the PC
+        prog = [{'column_joint': 0.2, 'shoulder_joint': -0.02, 'forearm_joint': 0.4, 'wrist_joint': 0.0, 'left_finger_joint': 0.0},
+                {'column_joint': 9.0, 'shoulder_joint': -0.03, 'forearm_joint': -0.3, 'wrist_joint': 0.1, 'left_finger_joint': -0.02}]
+        r = cmd('teach_set', points=prog)
+        tp = state()['teach']['points']
+        check(r.get('ok') and len(tp) == 2 and tp[1]['column_joint'] < 3.0, f'program loaded on the PC, out-of-range value clamped ({tp[1]["column_joint"] if len(tp) > 1 else None})')
+        bad = cmd('teach_set', points='nothing')
+        check(not bad.get('ok'), f'a broken program is refused ({bad.get("error")})')
+        cmd('save_program', name='e2e test')
+        saved = os.path.join(home, 'scara_programs', 'e2e_test.json')
+        check(os.path.exists(saved) and len(json.load(open(saved))['poses']) == 2, f'program saved on the PC ({saved})')
+        cmd('teach_clear')
         # ---- STOP
         cmd('move', q={'column_joint': -0.6})
         time.sleep(0.4)
@@ -220,6 +235,14 @@ def main():
                 pk = [p for p in (st['sim'].get('pucks') or []) if p.get('c')]
                 check(len(pk) >= 1, f'world {w}: the pucks on the belt reach the app ({len(pk)}: '
                                     f'{sorted(set(p["c"] for p in pk))})')
+            if w == 'command':
+                # 3.3: belt tracking reaches the MuJoCo command cell and its state comes back to the app
+                r = cmd('belt_tracking', on=True)
+                st = wait(lambda s: s['sim'].get('tracking') is True, 10)
+                check(r.get('ok') and st['sim'].get('tracking') is True, f'belt tracking on in the MuJoCo command cell ({r})')
+                cmd('belt_tracking', on=False)
+                st = wait(lambda s: s['sim'].get('tracking') is False, 10)
+                check(st['sim'].get('tracking') is False, 'belt tracking off again')
         st = state()
         check(len(st['sim'].get('pucks') or []) == 6, 'table world: the 6 table pucks, nothing from the command cell')
         cmd('control', mode='both')

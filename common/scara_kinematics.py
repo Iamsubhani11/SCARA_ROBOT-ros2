@@ -11,7 +11,7 @@ Planar model (wrist_joint kept at 0 for picking round pucks):
     with a1 = BASE_YAW + t1   (the robot base is turned by BASE_YAW on the table)
 """
 import os as _os, sys as _sys  # noqa: E401 - the other folders of this package (common/, mujoco/ ...)
-_sys.path[:0] = [_os.path.join(_os.path.dirname(_os.path.abspath(__file__)), '..', _d)
+_sys.path[:0] = [_os.path.join(_os.path.dirname(_os.path.realpath(__file__)), '..', _d)
                  for _d in ('common', 'mujoco', 'gazebo', 'real_robot', 'server', 'gesture_control')]
 import math
 
@@ -135,6 +135,55 @@ def arm_pose(x, y, z_joint, prefer=None, yaw=None, symmetry=math.pi / 2):
     return [t1, z_joint, t2, t3]
 
 
+def jacobian(t1, t2):
+    """2 x 2 Jacobian of the pad centre (x, y) with respect to (column, forearm), wrist at 0.
+
+    It tells how fast the pad moves for a small turn of each joint:
+        [dx, dy] = J * [dt1, dt2]
+    Its determinant is L1 * L2_EFF * sin(t2): zero when the arm is straight (t2 = 0), the
+    singularity where the pad cannot move along the arm any more (the app's manipulability)."""
+    a1 = t1 + S.BASE_YAW
+    a12 = a1 + t2
+    l1, l2 = S.L1, S.L2_EFF
+    return [[-l1 * math.sin(a1) - l2 * math.sin(a12), -l2 * math.sin(a12)],
+            [l1 * math.cos(a1) + l2 * math.cos(a12), l2 * math.cos(a12)]]
+
+
+def joint_rates(t1, t2, vx, vy, min_sin=0.15):
+    """Joint speeds (column, forearm) that move the pad at (vx, vy) m/s: q_dot = J^-1 * v.
+    Raises IKError near the straight-arm singularity, where J^-1 would ask for huge speeds."""
+    if abs(math.sin(t2)) < min_sin:
+        raise IKError(f'too close to the straight-arm singularity (sin t2 = {math.sin(t2):.2f})')
+    (a, b), (c, d) = jacobian(t1, t2)
+    det = a * d - b * c
+    return ((d * vx - b * vy) / det, (-c * vx + a * vy) / det)
+
+
+def track_line(t1, t2, p0, v, T, dt=0.02, margin=0.02):
+    """Follow a point that starts at p0 = (x, y) and moves at v = (vx, vy) m/s for T s
+    (a puck on the running belt), with the Jacobian - "resolved-rate" control:
+
+        q(k+1) = q(k) + J^-1(q(k)) * (v + (p_wanted(k) - p_now(k)) / dt) * dt
+
+    The first part is the belt speed turned into joint speeds; the second part pulls the
+    pad back onto the puck if the small steps have drifted. Returns a list of (t, t1, t2)
+    every dt seconds. Raises IKError if a joint would leave its limits or the arm would
+    come too close to a singularity on the way."""
+    out = [(0.0, t1, t2)]
+    n = max(1, int(round(T / dt)))
+    for k in range(1, n + 1):
+        t = k * dt
+        want = (p0[0] + v[0] * t, p0[1] + v[1] * t)
+        now = fk_xy(t1, t2)
+        ex, ey = (want[0] - now[0]) / dt, (want[1] - now[1]) / dt
+        w1, w2 = joint_rates(t1, t2, ex, ey)
+        t1, t2 = t1 + w1 * dt, t2 + w2 * dt
+        if not (within('column_joint', t1, margin) and within('forearm_joint', t2, margin)):
+            raise IKError('following the belt would take a joint past its limit')
+        out.append((t, t1, t2))
+    return out
+
+
 if __name__ == '__main__':
     # Self-test: IK -> FK round trip over the whole workspace + key targets
     import random
@@ -153,6 +202,36 @@ if __name__ == '__main__':
         worst = max(worst, math.hypot(fx - x, fy - y))
         n += 1
     print(f'IK/FK round trip: {n} samples, worst error {worst * 1000:.6f} mm')
+    fails = []
+    if not (n > 5000 and worst < 1e-6):
+        fails.append('IK/FK round trip')
+    # the Jacobian against small finite differences of fk_xy
+    jworst = 0.0
+    for _ in range(2000):
+        t1, t2, h = random.uniform(-1.8, 1.8), random.uniform(-1.8, 1.8), 1e-6
+        J = jacobian(t1, t2)
+        x0, y0 = fk_xy(t1, t2)
+        for col, (d1, d2) in enumerate(((h, 0.0), (0.0, h))):
+            x1, y1 = fk_xy(t1 + d1, t2 + d2)
+            jworst = max(jworst, abs((x1 - x0) / h - J[0][col]), abs((y1 - y0) / h - J[1][col]))
+    print(f'Jacobian vs finite differences: worst {jworst:.2e}')
+    if jworst > 1e-4:
+        fails.append('Jacobian')
+    # follow a puck on the running belt with the Jacobian, compare with exact IK
+    s0, T = -0.12, 2.6
+    p0 = S.belt_point(s0)
+    v = (S.BELT_DIR[0] * S.BELT_SPEED, S.BELT_DIR[1] * S.BELT_SPEED)
+    q1, q2 = ik_xy(*p0)
+    path = track_line(q1, q2, p0, v, T)
+    terr = max(math.hypot(fk_xy(a, b)[0] - (p0[0] + v[0] * t), fk_xy(a, b)[1] - (p0[1] + v[1] * t)) for t, a, b in path)
+    print(f'belt tracking with the Jacobian: {len(path)} steps over {T} s, worst pad error {terr * 1000:.3f} mm')
+    if terr > 0.0005:
+        fails.append('belt tracking')
+    try:
+        track_line(0.0, 0.01, fk_xy(0.0, 0.01), (0.05, 0.0), 1.0)
+        fails.append('singularity not refused')
+    except IKError:
+        print('straight arm (singularity): tracking refused, as it should be')
     px, py = S.belt_point(sum(S.PICK_WINDOW_S) / 2)
     print('pick point', [round(v, 3) for v in arm_pose(px, py, S.Z_PICK)])
     for c in S.COLOR_ORDER:
@@ -164,3 +243,7 @@ if __name__ == '__main__':
               f'gripper yaw {yaw:.1f} vs bin {math.degrees(S.bin_yaw(c)):.1f} (mod 90)')
     for sb in (-0.10, -0.05, 0.0, 0.08, 0.15, 0.20, 0.25):
         print(f'belt s={sb:+.2f} reachable:', reachable(*S.belt_point(sb)))
+    for f in fails:
+        print('FAIL', f)
+    print('ALL KINEMATICS CHECKS PASSED' if not fails else f'{len(fails)} FAILED')
+    raise SystemExit(1 if fails else 0)

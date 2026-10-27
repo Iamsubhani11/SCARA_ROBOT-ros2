@@ -62,6 +62,7 @@
       <div class="seg cammode" id="camMode" aria-label="Camera view">
         <button data-cm="dock" data-ic="▤" title="Camera in its own place - the robot view stays full size">Docked</button><button data-cm="float" data-ic="❐" title="A window you can move and resize">Window</button><button data-cm="mini" data-ic="▭" title="Small, in the corner">Small</button>
       </div>
+      <button id="handEng" type="button" data-ic="✋" title="Switch between MediaPipe hand tracking and the simple colour tracker">Tracker: MediaPipe</button>
       <button id="handCal" type="button" data-ic="↻" title="Learn your hand again (or double-tap the picture)">Learn again</button>
       <button id="camClose" type="button" class="camx" aria-label="Turn gesture control off" title="Turn gesture control off">&#x2715;</button>
     </div>
@@ -69,6 +70,7 @@
       <video id="handVideo" playsinline muted></video>
       <canvas id="handOverlay" aria-hidden="true"></canvas>
       <canvas id="handView" class="maskview" width="80" height="60" title="What the tracker sees: your hand in blue"></canvas>
+      <div class="camengine" id="handEngine"></div>
       <div class="camstatus"><span id="handText">Gesture control</span><em id="handGrip"></em></div>
     </div>
     <div class="camsize" id="camSplit" role="separator" aria-label="Drag to make the camera bigger or smaller" tabindex="0"><i></i></div>
@@ -158,7 +160,12 @@
       <div class="row">
         <button id="beltRun" class="primary">Start</button>
         <button id="beltStop">Stop</button>
+        <button id="beltTrack" title="Command cell: pick the pucks from the moving belt (Jacobian) instead of stopping it">Follow belt</button>
       </div>
+      <div class="row">
+        <button id="demoRun" title="Runs the table, the sorting cell and the command cell one after another - for a presentation">Demo for the review</button>
+      </div>
+      <p class="note" id="demoNote" hidden></p>
       <p class="note" id="cellNote">The conveyor cell runs in the PC simulation (sorting or command mode).</p>
       <form class="row" id="cmdForm" autocomplete="off">
         <input id="cmdText" placeholder='Type: "red then blue", "3 green", "any"' aria-label="Command">
@@ -200,6 +207,24 @@
       </div>
       <div class="list" id="tList"></div>
       <div class="row"><p class="note" id="tNote">Move the arm, save poses, then play them back in order.</p><button id="tClear" style="flex:0 0 auto">Clear all</button></div>
+      <h3 class="sub">Programs: keep a list of poses</h3>
+      <div class="row">
+        <input id="prName" placeholder="Program name, e.g. stack_3" aria-label="Program name">
+        <button id="prSave" style="flex:0 0 auto">Save as program</button>
+      </div>
+      <div class="row">
+        <select id="prList" aria-label="Saved programs"><option value="">Saved programs…</option></select>
+        <button id="prLoad" style="flex:0 0 auto">Load</button>
+        <button id="prDel" style="flex:0 0 auto">Delete</button>
+      </div>
+      <div class="row">
+        <button id="prExport">Export file</button>
+        <button id="prImport">Import file</button>
+        <input type="file" id="prFile" accept=".json,application/json" hidden>
+      </div>
+      <textarea id="prText" rows="4" hidden aria-label="Program as text" placeholder="Paste a program (.json text) here, then tap Import file again"></textarea>
+      <p class="note" id="prNote">A program is the poses above with their gripper state. Programs are kept on this device; Export
+        downloads a .json file (the phone app saves it on the PC in ~/scara_programs/).</p>
       <h3 class="sub">Exact position</h3>
       <div class="sliders" id="sliders">
         <label><span>Column</span><input type="range" data-j="column_joint" step="any"><b></b></label>
@@ -235,6 +260,18 @@
         <button id="kTap">Tap the table</button>
       </div>
       <div class="ksol" id="kSol"></div>
+      <h3 class="sub">Draw a path: the gripper follows it</h3>
+      <div class="row">
+        <button id="pDraw">Draw on the table</button>
+        <select id="pShape" aria-label="Ready-made path"><option value="">Shape…</option><option value="circle">Circle</option><option value="square">Square</option><option value="star">Star</option><option value="eight">Figure 8</option></select>
+      </div>
+      <div class="row">
+        <button id="pRun" class="primary" disabled>Run path</button>
+        <label class="check" style="flex:0 0 auto"><input type="checkbox" id="pLoop"> Loop</label>
+        <button id="pClear" disabled>Clear</button>
+      </div>
+      <p class="note" id="pNote">Draw with your finger (or the mouse) on the table, or choose a shape. The gripper follows it at its
+        present height, using the inverse kinematics for every point. Red parts are out of reach.</p>
       <label class="check"><input type="checkbox" id="kReach" checked> Show the reachable area on the table</label>
       <label class="check"><input type="checkbox" id="kTrail"> Show the gripper's path (last 20 s)</label>
       <h3 class="sub">Motion graph: the joints over the last 10 s</h3>
@@ -399,6 +436,7 @@
 <script src="sim.js"></script>
 <script src="voice.js"></script>
 <script src="hand.js"></script>
+<script src="handmp.js"></script>
 <script src="meshes.js"></script>
 <script src="brand.js"></script>
 <script src="app.js"></script>

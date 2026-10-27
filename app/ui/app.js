@@ -18,6 +18,8 @@ const SC = window.SCARA_SCENE;
 const JOINTS = ['column_joint', 'shoulder_joint', 'forearm_joint', 'wrist_joint', 'left_finger_joint'];
 const ARM = JOINTS.slice(0, 4);
 const RATE = { column_joint: 0.7, shoulder_joint: 0.045, forearm_joint: 0.7, wrist_joint: 1.4 };   // per s at 100 %
+const SLOW = { column_joint: 0.6, forearm_joint: 0.6, wrist_joint: 1.0 };   // rad/s in Safe mode (common/scara_safety.py)
+const LEAD = 0.3;                     // XY drive: the target may be at most this many seconds ahead of the arm
 const PUCK_RGB = { red: 0xd63a32, green: 0x2f9e44, blue: 0x1c6ed6, yellow: 0xe6b400 };
 const $ = (id) => document.getElementById(id);
 const store = {
@@ -548,6 +550,8 @@ function simCmd(name, args) {
     }
     case 'teach_delete': app.teachLocal.splice(args.index, 1); store.set('teach', app.teachLocal); showTeach(app.teachLocal, false); return true;
     case 'teach_clear': app.teachLocal = []; store.set('teach', []); showTeach([], false); return true;
+    case 'teach_set': app.teachLocal = args.points.map((p) => ({ ...p })); store.set('teach', app.teachLocal); showTeach(app.teachLocal, false); return true;
+    case 'save_program': return true;
     case 'teach_goto': if (app.teachLocal[args.index]) Object.assign(t, app.teachLocal[args.index]); return true;
     case 'teach_play': {
       if (S.running) { toast('Stop the cell first'); return false; }
@@ -577,6 +581,9 @@ function simCmd(name, args) {
     case 'pick_place': S.pickPlace({ x: args.x, y: args.y }, { x: args.to_x, y: args.to_y }); return true;
     case 'safety': S.mode = args.mode; document.querySelectorAll('#safety button').forEach((b) => b.classList.toggle('on', b.dataset.v === S.mode)); return true;
     case 'speed': S.scale = args.scale; return true;
+    case 'belt_tracking':
+      if (S.world !== 'command') { toast('Belt tracking works in the Command cell'); return true; }
+      S.track = !!args.on; toast(S.track ? 'Belt tracking on: the robot follows the moving belt' : 'Belt tracking off'); return true;
     default:
       toast('Offline mode: teaching and the real robot need the PC');
       return false;
@@ -685,6 +692,8 @@ function showCell(c) {
   $('cellNote').textContent = c.note;
   document.querySelectorAll('#world button').forEach((b) => b.classList.toggle('on', b.dataset.w === c.world));
   $('beltRun').classList.toggle('on', !!c.running);
+  $('beltTrack').classList.toggle('on', !!c.tracking);
+  $('beltTrack').textContent = c.tracking ? `Following belt${c.tracked ? ` (${c.tracked})` : ''}` : 'Follow belt';
   $('beltRun').textContent = c.running ? 'Running' : 'Start';
 }
 
@@ -695,7 +704,7 @@ function onState(st) {
   const ctl = st.control;
   const simJ = sim.joints, realJ = rob.joints;
   const shown = (ctl === 'robot' && realJ) ? realJ : (simJ || realJ || st.cmd);
-  if (shown) Object.assign(app.q, shown);
+  if (shown) { Object.assign(app.q, shown); app.qT = performance.now(); }
   app.real = realJ;
   const twin = rob.connected && rob.zeroed && simJ && realJ && ctl !== 'sim' && sim.kind !== 'hardware';   // hardware: sim IS the robot
   // the real robot as a yellow see-through arm - only where it is not where the sim is (when they
@@ -741,6 +750,7 @@ function onState(st) {
   const world = sim.switching || curWorld;
   app.pcWorlds = !!sim.worlds && !sim.switching;
   showCell({ active: sim.active, sequence: sim.sequence, sorted: sim.sorted, world, running: sim.autonomous || (st.belt && st.belt.on),
+    tracking: sim.tracking, tracked: sim.tracked,
     note: sim.commands ? 'Command mode on the PC: a colour stays active until you pick another one.'
       : world === 'sort' ? 'Sorting mode on the PC: every colour goes to its own bin. Start / Stop runs the belt.'
         : sim.worlds ? 'MuJoCo on the PC: choose Sorting or Command above to run the conveyor cell.'
@@ -862,7 +872,8 @@ setInterval(() => {
   const kb = keyVec();
   if (kb.active) { lx = lx || kb.lx; ly = ly || kb.ly; }
   if (pad.active) { lx = lx || pad.lx; ly = ly || pad.ly; }
-  const rx = dead(R.x) || kb.rx || pad.rx, ry = dead(R.y) || kb.ry || pad.ry;
+  let rx = dead(R.x) || kb.rx || pad.rx, ry = dead(R.y) || kb.ry || pad.ry;
+  if (app.hand && !rx && !ry) { const h = window.ScaraHand.out; if (h.seen2) { rx = handDead(h.rx); ry = handDead(h.ry); } }   // 2nd hand or pinch
   const active = lx || ly || rx || ry;
   if (!active) {
     if (app.cart && now - idleSince > 400) { app.cart = null; app.cartQ = null; }
@@ -883,6 +894,13 @@ setInterval(() => {
     const nyaw = c.yaw - rx * Math.abs(rx) * 1.2 * app.speed * dt;
     const sol = kik(nx, ny, nyaw, app.cartQ);
     if (!sol) { buzz(20); return; }                      // edge of the workspace: stay
+    // bug 34: every joint follows its target at its own speed limit, so a target far ahead of the arm
+    // made it turn the gripper on the way and keep moving after the stick was let go.
+    // Only step on while the arm is less than LEAD s behind the last target (when we know where the arm is).
+    if (now - (app.qT || 0) < 500) {
+      const behind = Math.max(...['column_joint', 'forearm_joint', 'wrist_joint'].map((j) => Math.abs(app.cartQ[j] - app.q[j]) / (SLOW[j] * app.speed)));
+      if (behind > LEAD) return;                         // wait for the arm to catch up
+    }
     Object.assign(c, { x: nx, y: ny, z: nz, yaw: nyaw });
     app.cartQ = { column_joint: sol.column_joint, shoulder_joint: nz, forearm_joint: sol.forearm_joint, wrist_joint: sol.wrist_joint };
     cmd('move', { q: app.cartQ });
@@ -1015,6 +1033,7 @@ on('seqRun', () => {
   refreshEnabled();
 });
 on('beltRun', () => cmd('conveyor', { run: true }));
+on('beltTrack', () => cmd('belt_tracking', { on: !$('beltTrack').classList.contains('on') }));
 on('beltStop', () => cmd('conveyor', { run: false }));
 function setDrive(d) {
   app.drive = d; store.set('drive', d); app.cart = null; app.cartQ = null;
@@ -1032,9 +1051,15 @@ function onTilt(e) {
 }
 on('tilt', () => {
   if (app.tilt) { app.tilt = null; window.removeEventListener('deviceorientation', onTilt); $('tilt').classList.remove('on'); return; }
-  const go = () => { app.tilt = {}; window.addEventListener('deviceorientation', onTilt); $('tilt').classList.add('on'); toast('Tilt drive: hold the phone the way it is now - tilting it moves the arm'); };
+  const go = () => {
+    app.tilt = {}; window.addEventListener('deviceorientation', onTilt); $('tilt').classList.add('on');
+    toast('Tilt drive: hold the phone the way it is now - tilting it moves the arm');
+    setTimeout(() => { if (app.tilt && app.tilt.x === undefined) toast('Tilt: no tilt sensor data from this device'); }, 1500);
+  };
+  // bug 35: newer Chrome / Android WebView also have requestPermission() and it can fail although
+  // Android needs no permission for the tilt sensor - so only a clear "denied" stops us (iPhone)
   if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function') {
-    DeviceOrientationEvent.requestPermission().then((r) => (r === 'granted' ? go() : toast('Tilt needs motion access'))).catch(() => toast('Tilt needs motion access'));
+    DeviceOrientationEvent.requestPermission().then((r) => (r === 'denied' ? toast('Tilt needs motion access (allow it in the browser settings)') : go())).catch(() => go());
   } else go();
 });
 $('gripFine').addEventListener('input', () => {
@@ -1053,6 +1078,145 @@ $('cmdForm').addEventListener('submit', (e) => {
   $('cmdText').value = '';
   $('cmdText').blur();
 });
+/* ------------------------------------------------------------------ v3.3: programs (lists of poses) */
+const PROG_JOINTS = ['column_joint', 'shoulder_joint', 'forearm_joint', 'wrist_joint', 'left_finger_joint'];
+function teachNow() { return app.link === 'twin' ? ((app.st && app.st.teach && app.st.teach.points) || []) : app.teachLocal; }
+function programs() { return store.get('programs', {}) || {}; }
+function showPrograms(sel) {
+  const names = Object.keys(programs()).sort();
+  $('prList').innerHTML = '<option value="">Saved programs…</option>' + names.map((n) => `<option${n === sel ? ' selected' : ''}>${escapeHtml(n)}</option>`).join('');
+}
+/* a program file: {"scara_program": 1, "name": "...", "poses": [{column_joint: ..., ...}, ...]} - or just the list */
+function parseProgram(text) {
+  let d;
+  try { d = JSON.parse(text); } catch (e) { throw new Error('this is not a program file (not JSON)'); }
+  const poses = Array.isArray(d) ? d : d && d.poses;
+  if (!Array.isArray(poses) || !poses.length || poses.length > 500) throw new Error('no poses in the file');
+  return { name: (d && d.name) || 'imported', poses: poses.map((p, i) => {
+    const q = {};
+    for (const j of PROG_JOINTS) {
+      const v = Number(p && p[j] !== undefined ? p[j] : 0);
+      if (!Number.isFinite(v)) throw new Error(`pose ${i + 1}: ${j} is not a number`);
+      q[j] = clamp(v, ...limits(j));
+    }
+    return q;
+  }) };
+}
+function loadProgram(pr) { cmd('teach_set', { points: pr.poses }); toast(`Program "${pr.name}" loaded: ${pr.poses.length} poses - Play runs it`); }
+on('prSave', () => {
+  const name = ($('prName').value.trim() || `program_${Object.keys(programs()).length + 1}`).replace(/[^\w .-]/g, '_').slice(0, 40);
+  const pts = teachNow();
+  if (!pts.length) { toast('Save some poses first'); return; }
+  const all = programs(); all[name] = pts.map((p) => ({ ...p })); store.set('programs', all);
+  showPrograms(name); $('prNote').textContent = `Saved "${name}" (${pts.length} poses) on this device`;
+});
+on('prLoad', () => {
+  const n = $('prList').value, all = programs();
+  if (!n || !all[n]) { toast('Choose a program first'); return; }
+  loadProgram({ name: n, poses: all[n] });
+});
+on('prDel', () => {
+  const n = $('prList').value, all = programs();
+  if (!n || !all[n] || !confirm(`Delete the program "${n}"?`)) return;
+  delete all[n]; store.set('programs', all); showPrograms();
+});
+on('prExport', () => {
+  const pts = teachNow();
+  if (!pts.length) { toast('Nothing to export - save some poses first'); return; }
+  const name = ($('prName').value.trim() || $('prList').value || 'scara_program').replace(/[^\w.-]/g, '_').slice(0, 40);
+  const text = JSON.stringify({ scara_program: 1, name, poses: pts }, null, 1);
+  if (window.ScaraNative) {                  // the Android app cannot download: the PC keeps it, or copy the text
+    if (app.link === 'twin') { cmd('save_program', { name }); toast('Saved on the PC in ~/scara_programs/'); return; }
+    $('prText').hidden = false; $('prText').value = text; $('prText').select();
+    $('prNote').textContent = 'Offline on the phone: copy this text and keep it (paste it back with Import file)';
+    return;
+  }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+  a.download = name + '.json'; document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  toast(`Exported ${name}.json`);
+});
+on('prImport', () => {
+  // pasted text first (the Android WebView has no file picker), else the file picker
+  if (!$('prText').hidden && $('prText').value.trim()) {
+    try { const pr = parseProgram($('prText').value); loadProgram(pr); $('prText').hidden = true; $('prText').value = ''; }
+    catch (e) { toast('Import: ' + e.message); }
+    return;
+  }
+  if (window.ScaraNative) { $('prText').hidden = false; $('prText').focus(); $('prNote').textContent = 'Paste the program text, then tap Import file again'; return; }
+  $('prFile').click();
+});
+$('prFile').addEventListener('change', () => {
+  const f = $('prFile').files[0];
+  if (!f) return;
+  f.text().then((t) => { const pr = parseProgram(t); if (!$('prName').value) $('prName').value = pr.name; loadProgram(pr); })
+    .catch((e) => toast('Import: ' + e.message)).finally(() => { $('prFile').value = ''; });
+});
+showPrograms();
+
+/* ------------------------------------------------------------------ v3.3: demo for the final review
+   Shows every world one after another, with the same commands the buttons send - so it runs offline,
+   with MuJoCo and with Gazebo (there each world switch restarts Gazebo, about 30 s).
+     1. Table: the gripper draws a star, then carries a puck to a new place (tap pick & place)
+     2. Sorting cell: every colour into its own bin
+     3. Command cell: "red then blue", then every colour with belt tracking (pick from the moving belt)
+   Tap the button again (or STOP) to end it. */
+const demo = { on: false, step: '' };
+const curWorld3 = () => (app.link === 'demo' ? app.sim && app.sim.world : app.st && app.st.sim && !app.st.sim.switching && app.st.sim.world);
+function demoSay(t) { demo.step = t; $('demoNote').hidden = !t; $('demoNote').textContent = t; if (t) toast(t); }
+async function demoWait(secs, until) {                   // false when the demo was stopped
+  const t0 = performance.now();
+  while (performance.now() - t0 < secs * 1000) {
+    if (!demo.on || $('estop').classList.contains('latched')) return false;
+    if (until && until()) return true;
+    await new Promise((r) => setTimeout(r, 250));
+  }
+  return demo.on;
+}
+async function demoWorld(w) {
+  if (curWorld3() !== w) setWorld(w);
+  if (!await demoWait(150, () => curWorld3() === w)) return false;
+  return demoWait(2.5);                                  // let the new world settle
+}
+async function demoRun() {
+  if (demo.on) { demo.on = false; pathStop(); demoSay(''); $('demoRun').classList.remove('on'); $('demoRun').textContent = 'Demo for the review'; return; }
+  if (!(app.link === 'demo' || app.link === 'twin')) { toast('Connect to the PC or tap Try offline first'); return; }
+  demo.on = true; $('demoRun').classList.add('on'); $('demoRun').textContent = 'Stop the demo';
+  try {
+    demoSay('Demo 1/3 - the table: the gripper draws a star, then moves a puck');
+    if (!await demoWorld('manual')) return;
+    cmd('home');
+    if (!await demoWait(4)) return;
+    pathShape('star'); pathRun();
+    if (!await demoWait(60, () => !path.run)) return;
+    const pk = (app.pucks || [])[0];
+    if (pk) {
+      const f = fkFull(currentTarget());
+      cmd('pick_place', { x: pk.x, y: pk.y, to_x: (pk.x + f.xw) / 2, to_y: (pk.y + f.yw) / 2 });
+      if (!await demoWait(25)) return;
+    }
+    pathSet([]);
+    demoSay('Demo 2/3 - the sorting cell: the camera finds each puck, every colour goes to its own bin');
+    if (!await demoWorld('sort')) return;
+    cmd('conveyor', { run: true });
+    if (!await demoWait(50)) return;
+    demoSay('Demo 3/3 - the command cell: "red then blue", then every colour picked from the moving belt');
+    if (!await demoWorld('command')) return;
+    cmd('conveyor', { run: true }); cmd('pick', { color: 'red then blue' });
+    if (!await demoWait(35)) return;
+    cmd('belt_tracking', { on: true }); cmd('pick', { color: 'any' });
+    if (!await demoWait(40)) return;
+    cmd('belt_tracking', { on: false });
+    demoSay('Demo finished - thank you!');
+    await demoWait(4);
+  } finally {
+    demo.on = false; $('demoRun').classList.remove('on'); $('demoRun').textContent = 'Demo for the review';
+    setTimeout(() => { if (!demo.on) demoSay(''); }, 5000);
+  }
+}
+on('demoRun', demoRun);
+
 on('addPuck', () => {
   const S = app.sim; if (!S) return;
   const cs = ['red', 'green', 'blue', 'yellow'], c = cs[Math.floor(Math.random() * 4)];
@@ -1179,27 +1343,45 @@ function handStatus(t) { $('handText').textContent = t; }
 async function handOn() {
   // Android: the app needs the camera permission first (asked once)
   if (window.ScaraNative && window.ScaraNative.hasCamera && !window.ScaraNative.hasCamera()) {
-    window.onNativePermission = (ok) => { if (ok) handOn(); else toast('Gesture control needs the camera - allow it in Android Settings > Apps > SCARA Digital Twin > Permissions'); };
+    window.onNativePermission = (ok) => {
+      if (ok) { handOn(); return; }
+      const why = 'Gesture control needs the camera - allow it in Android Settings > Apps > SCARA Digital Twin > Permissions';
+      camShow(true); handStatus(why); $('handEngine').textContent = 'Camera off'; camEl.dataset.engine = 'error'; toast(why);
+    };
     window.ScaraNative.askCamera();
     return;
   }
   try {
     camShow(true);
-    handStatus('Starting the camera…');
+    handStatus('Starting the camera…'); handEngineShow();
     $('hand').classList.add('on'); $('vHand').classList.add('on');
-    await Promise.race([window.ScaraHand.start($('handVideo'), $('handView'), handStatus),
-      new Promise((_, no) => setTimeout(() => no(new Error('the camera did not start - close other apps that use it and try again')), 12000))]);
+    // 60 s: the browser may be waiting for you to allow the camera
+    await Promise.race([window.ScaraHand.start($('handVideo'), $('handView'), handStatus, store.get('handEngine', 'auto')),
+      new Promise((_, no) => setTimeout(() => no(new Error('The camera did not start - close other apps that use it and try again')), 60000))]);
+    if (!$('hand').classList.contains('on')) return;        // switched off while it was starting
     app.hand = true; handFist = null;
-    toast('Gesture control: hold your open hand in the yellow square for 2 s');
+    handEngineShow();
+    toast(window.ScaraHand.engine === 'mediapipe' ? 'Gesture control (MediaPipe): bring your hand to the middle circle, then move it'
+      : 'Gesture control: hold your open hand in the yellow square for 2 s');
     if (app.tilt) $('tilt').click();
   } catch (e) {
     window.ScaraHand.stop();
-    camShow(false);
     $('hand').classList.remove('on'); $('vHand').classList.remove('on');
-    toast(location.protocol === 'http:' && !['localhost', '127.0.0.1'].includes(location.hostname)
-      ? 'The browser only allows the camera on http://localhost (or https) - use the PC itself or the Android app'
-      : 'Camera not available: ' + (e.message || e.name || e));
+    // keep the camera window open with the reason in it - nothing fails silently any more
+    const why = (e && e.message) || (e && e.name) || String(e);
+    handStatus(why); $('handEngine').textContent = 'Camera off'; camEl.dataset.engine = 'error';
+    toast(why);
   }
+}
+/* which tracker is running, in the camera window (and a button to switch between them) */
+function handEngineShow() {
+  const H = window.ScaraHand;
+  camEl.dataset.engine = H.engine || 'off';
+  $('handEngine').textContent = H.label ? H.label() : '';
+  const skin = store.get('handEngine', 'auto') === 'skin';
+  $('handEng').textContent = skin ? 'Tracker: colour' : 'Tracker: MediaPipe';
+  $('handEng').classList.toggle('skin', skin);
+  $('handEng').title = skin ? 'Simple colour tracker chosen - tap for MediaPipe hand tracking' : 'MediaPipe hand tracking - tap for the simple colour tracker';
 }
 function handOff() {
   window.ScaraHand.stop();
@@ -1211,6 +1393,10 @@ const handToggle = () => (app.hand || $('hand').classList.contains('on') ? handO
 on('hand', handToggle);
 on('vHand', handToggle);
 on('handCal', () => window.ScaraHand.calibrate());
+on('handEng', () => {                         // MediaPipe <-> the simple colour tracker
+  store.set('handEngine', store.get('handEngine', 'auto') === 'skin' ? 'auto' : 'skin');
+  if (app.hand) { handOff(); handOn(); } else handEngineShow();
+});
 on('camClose', () => handOff());
 
 /* The gesture camera, like the camera window of Gazebo / MuJoCo - it never squeezes the robot view:
@@ -1280,6 +1466,35 @@ camApply();
 /* what the hand tracker sees, drawn over the (mirrored) camera picture */
 function camOverlay() {
   requestAnimationFrame(camOverlay);
+/* MediaPipe: the 21 points and bones of every hand, the still circle of each joystick hand */
+function mpOverlay(g, v, X, Y, pw, dpr) {
+  // MediaPipe's points, the circles and the sticks are in the MIRRORED picture (0..1); X() takes
+  // camera-picture fractions and mirrors them itself - so every x goes in as 1 - x
+  const M = (u) => X(1 - u);
+  const label = (t, x, y) => { g.lineWidth = 3 * dpr; g.strokeStyle = '#000000b0'; g.strokeText(t, x, y); g.fillText(t, x, y); g.lineWidth = 2 * dpr; };
+  for (const c of v.circles) {
+    const s = c.stick, armed = s && s.armed;
+    g.strokeStyle = armed ? '#ffffffcc' : '#ffc61a'; g.setLineDash(armed ? [] : [6 * dpr, 5 * dpr]);
+    g.beginPath(); g.arc(M(c.home.x), Y(c.home.y), v.deadR * pw, 0, 7); g.stroke(); g.setLineDash([]);
+    if (v.circles.length === 1) { g.strokeStyle = '#ffffff44'; g.beginPath(); g.arc(M(c.home.x), Y(c.home.y), v.travel * pw, 0, 7); g.stroke(); }
+    g.fillStyle = '#ffffff'; label(c.tag === 'L' ? 'left stick' : 'right stick', M(c.home.x) - 26 * dpr, Y(c.home.y) + v.deadR * pw + 14 * dpr);
+    if (armed && s.p) { g.strokeStyle = '#ffc61a'; g.beginPath(); g.moveTo(M(c.home.x), Y(c.home.y)); g.lineTo(M(s.p.x), Y(s.p.y)); g.stroke(); }
+  }
+  v.hands.forEach((h, i) => {
+    const right = v.hands.length >= 2 && i === v.hands.length - 1;
+    const col = v.pinch ? '#b48cff' : right ? '#ff9d2e' : '#3fa9ff';
+    g.strokeStyle = col; g.lineWidth = 2.5 * dpr;
+    for (const [a, b] of v.bones) { g.beginPath(); g.moveTo(M(h.lm[a].x), Y(h.lm[a].y)); g.lineTo(M(h.lm[b].x), Y(h.lm[b].y)); g.stroke(); }
+    g.fillStyle = '#fff';
+    for (const p of h.lm) { g.beginPath(); g.arc(M(p.x), Y(p.y), 2.6 * dpr, 0, 7); g.fill(); }
+    const fist = !right && !v.pinch && v.out.fist;
+    g.fillStyle = fist ? '#e8463a' : col;
+    g.beginPath(); g.arc(M(h.c.x), Y(h.c.y), 7 * dpr, 0, 7); g.fill();
+    g.fillStyle = '#fff';
+    label(v.pinch ? 'pinch' : right ? 'right hand' : fist ? 'fist: gripper closes' : 'open hand', M(h.c.x) + 10 * dpr, Y(h.c.y) + 4 * dpr);
+  });
+  $('handGrip').textContent = v.out.fist ? 'GRIP' : '';
+}
   if ($('handCam').hidden || !window.ScaraHand.overlay) return;
   const cv = $('handOverlay'), vid = $('handVideo'), box = cv.getBoundingClientRect();
   const dpr = Math.min(2, window.devicePixelRatio || 1), W = Math.round(box.width * dpr), H = Math.round(box.height * dpr);
@@ -1290,6 +1505,7 @@ function camOverlay() {
   const X = (u) => ox + (1 - u) * pw, Y = (v) => oy + v * ph;                            // mirrored like the picture
   const v = window.ScaraHand.overlay();
   g.lineWidth = 2 * dpr; g.font = `${12 * dpr}px sans-serif`;
+  if (v.engine === 'mediapipe') { mpOverlay(g, v, X, Y, pw, dpr); return; }
   if (v.state === 'calibrating' || v.state === 'waiting') {
     const b = v.box || [0.35, 0.3, 0.65, 0.7];
     g.strokeStyle = '#ffc61a'; g.setLineDash([8 * dpr, 6 * dpr]);
@@ -1618,6 +1834,159 @@ on('kTap', () => {
   $('kTap').classList.toggle('on', app.kinTap);
   hint(app.kinTap ? 'Tap a point on the table' : '');
 });
+/* ------------------------------------------------------------------ v3.3: draw a path, the gripper follows it
+   The path is a list of table points (world frame) 4 mm apart. Running it streams 'move' targets
+   (inverse kinematics of each point, the yaw and height held) - so it works offline, with MuJoCo,
+   Gazebo and the real robot alike. Like the XY drive, the target never runs far ahead of the arm. */
+const pathGeo = new THREE.BufferGeometry();
+pathGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(3 * 4000), 3));
+pathGeo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(3 * 4000), 3));
+const pathLine = new THREE.Line(pathGeo, new THREE.LineBasicMaterial({ vertexColors: true, depthTest: false }));
+pathLine.renderOrder = 7; pathLine.frustumCulled = false;
+world.add(pathLine);
+const path = { pts: [], ok: [], draw: false, drawing: false, run: null };
+function pathSpaced(raw, step = 0.004) {                // even 4 mm steps along what was drawn
+  const out = raw.length ? [raw[0]] : [];
+  for (let i = 1; i < raw.length; i++) {
+    let [ax, ay] = out[out.length - 1];
+    const [bx, by] = raw[i];
+    let d = Math.hypot(bx - ax, by - ay);
+    while (d >= step) { ax += (bx - ax) * step / d; ay += (by - ay) * step / d; out.push([ax, ay]); d = Math.hypot(bx - ax, by - ay); }
+  }
+  return out.slice(0, 4000);
+}
+/* which points the arm can reach holding the gripper at `yaw` (each IK starts from the one before) */
+function pathReach(pts, yaw) {
+  let prev = currentTarget();
+  return pts.map(([x, y]) => { const s = kik(x, y, yaw, prev); if (s) prev = s; return !!s; });
+}
+function pathShow() {
+  const z = (scene.table_top || 0.4) + 0.002, k = KIN.k;
+  const P = pathGeo.attributes.position.array, C = pathGeo.attributes.color.array;
+  // the gripper keeps one direction along the path: the present one if that reaches every point,
+  // otherwise pointing away from the column, or sideways (the reach band moves with the gripper offset)
+  const yaws = [fkFull(currentTarget()).yawW, k.base_yaw, k.base_yaw + Math.PI / 2, k.base_yaw - Math.PI / 2];
+  let best = null;
+  for (const yw of yaws) {
+    const ok = pathReach(path.pts, yw), n = ok.filter(Boolean).length;
+    if (!best || n > best.n) best = { yaw: yw, ok, n };
+    if (n === path.pts.length) break;
+  }
+  path.yaw = best ? best.yaw : 0; path.ok = best ? best.ok : [];
+  path.pts.forEach(([x, y], i) => {
+    P[3 * i] = x; P[3 * i + 1] = y; P[3 * i + 2] = z;
+    const c = path.ok[i] ? [0.95, 0.72, 0.02] : [0.9, 0.2, 0.18];
+    C[3 * i] = c[0]; C[3 * i + 1] = c[1]; C[3 * i + 2] = c[2];
+  });
+  pathGeo.attributes.position.needsUpdate = pathGeo.attributes.color.needsUpdate = true;
+  pathGeo.setDrawRange(0, path.pts.length);
+  const bad = path.ok.filter((o) => !o).length;
+  $('pRun').disabled = !path.pts.length || bad > 0; $('pClear').disabled = !path.pts.length;
+  $('pNote').textContent = !path.pts.length ? 'Draw with your finger (or the mouse) on the table, or choose a shape.'
+    : bad ? `${bad} of ${path.pts.length} points are out of reach (red) - draw it closer to the robot`
+      : `Path: ${path.pts.length} points, ${(path.pts.length * 4 / 10).toFixed(0)} cm. Run path moves the gripper along it.`;
+}
+function pathSet(pts) { pathStop(); path.pts = pathSpaced(pts); pathShow(); }
+function pathShape(kind) {
+  // centred where the gripper is (or the ready point), sized to fit the reach
+  const f = fkFull(currentTarget()), k = KIN.k;
+  // where the gripper is - or 31.5 cm straight out in front of the column: with the elbow limit (2 rad)
+  // the wrist must stay 21-36 cm from the column, so this is the middle of what can be reached
+  const front = [k.column[0] + 0.315 * Math.cos(k.base_yaw), k.column[1] + 0.315 * Math.sin(k.base_yaw)];
+  const make = (c) => shapePoints(kind, c);
+  const reach = (pts) => [f.yawW, k.base_yaw].some((yw) => pathReach(pts, yw).every(Boolean));
+  const here = make([f.xw, f.yw]);
+  pathSet(reach(here) ? here : make(front));
+}
+function shapePoints(kind, c) {
+  const pts = [], N = 240;
+  for (let i = 0; i <= N; i++) {
+    const t = i / N * 2 * Math.PI;
+    let x, y;
+    if (kind === 'circle') { x = 0.05 * Math.cos(t); y = 0.05 * Math.sin(t); }
+    else if (kind === 'eight') { x = 0.06 * Math.sin(t); y = 0.035 * Math.sin(2 * t); }
+    else if (kind === 'star') { const k = Math.floor(i / (N / 10)), a = k * Math.PI / 5, r = k % 2 ? 0.024 : 0.06; x = r * Math.cos(a + Math.PI / 2); y = r * Math.sin(a + Math.PI / 2); }
+    else { const q = Math.floor(i / (N / 4)) % 4, u = (i % (N / 4)) / (N / 4), h = 0.045;
+      [x, y] = [[-h + 2 * h * u, -h], [h, -h + 2 * h * u], [h - 2 * h * u, h], [-h, h - 2 * h * u]][q]; }
+    pts.push([c[0] + x, c[1] + y]);
+  }
+  return pts;
+}
+function pathStop() {
+  if (path.run) { clearInterval(path.run.timer); path.run = null; }
+  $('pRun').textContent = 'Run path'; $('pRun').classList.remove('on');
+}
+function pathRun() {
+  if (path.run) { pathStop(); return; }
+  if (!path.pts.length || path.ok.some((o) => !o)) return;
+  const base = currentTarget();
+  const r = { i: 0, yaw: path.yaw, z: base.shoulder_joint, q: { ...base }, last: performance.now(), started: false };
+  r.timer = setInterval(() => {
+    const now = performance.now(), dt = Math.min((now - r.last) / 1000, 0.25);
+    r.last = now;
+    if ($('estop').classList.contains('latched')) { pathStop(); return; }
+    if (!r.started) {                                    // first go to the start of the path, then follow it
+      const s0 = kik(path.pts[0][0], path.pts[0][1], r.yaw, r.q);
+      if (!s0) { pathStop(); toast('Path: the start is out of reach'); return; }
+      r.q = { column_joint: s0.column_joint, shoulder_joint: r.z, forearm_joint: s0.forearm_joint, wrist_joint: s0.wrist_joint };
+      cmd('move', { q: r.q });
+      const g = fkFull(app.q);
+      if (Math.hypot(g.xw - path.pts[0][0], g.yw - path.pts[0][1]) < 0.003) r.started = true;
+      return;
+    }
+    // the arm must be less than 0.06 s behind the last target (the XY drive allows LEAD = 0.3 s, bug 34;
+    // a path needs less, or the gripper cuts the sharp corners of a star by up to 1 cm)
+    if (now - (app.qT || 0) < 500) {
+      const behind = Math.max(...['column_joint', 'forearm_joint', 'wrist_joint'].map((j) => Math.abs(r.q[j] - app.q[j]) / (SLOW[j] * app.speed)));
+      if (behind > 0.06) return;
+    }
+    // 4 cm/s at 100 %, but never more than one 4 mm point per tick: on a slow phone a late tick
+    // would otherwise jump the target ahead and the gripper would cut straight across a corner
+    r.acc = (r.acc || 0) + 0.04 * app.speed * dt;
+    if (r.acc < 0.004) return;
+    r.acc = Math.min(r.acc - 0.004, 0.004);
+    r.i += 1;
+    if (r.i >= path.pts.length) {
+      if ($('pLoop').checked) r.i = 0; else { pathStop(); toast('Path done'); return; }
+    }
+    const [x, y] = path.pts[r.i], s = kik(x, y, r.yaw, r.q);
+    if (!s) { pathStop(); toast('Path: a point is out of reach'); return; }
+    r.q = { column_joint: s.column_joint, shoulder_joint: r.z, forearm_joint: s.forearm_joint, wrist_joint: s.wrist_joint };
+    cmd('move', { q: r.q });
+  }, 50);
+  path.run = r;
+  $('pRun').textContent = 'Stop path'; $('pRun').classList.add('on');
+}
+function tablePoint(e) {
+  const r0 = canvas.getBoundingClientRect(), p = new THREE.Vector3();
+  ray.setFromCamera(new THREE.Vector2((e.clientX - r0.left) / r0.width * 2 - 1, -(e.clientY - r0.top) / r0.height * 2 + 1), cam);
+  return ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 0, 1), -(scene.table_top || 0.4)), p) ? [p.x, p.y] : null;
+}
+on('pDraw', () => {
+  path.draw = !path.draw;
+  $('pDraw').classList.toggle('on', path.draw);
+  controls.enabled = !path.draw;                      // while drawing, a drag draws instead of turning the view
+  hint(path.draw ? 'Draw the path on the table with one finger' : '');
+});
+canvas.addEventListener('pointerdown', (e) => {
+  if (!path.draw) return;
+  const p = tablePoint(e); if (!p) return;
+  pathStop(); path.drawing = [p]; canvas.setPointerCapture(e.pointerId);
+});
+canvas.addEventListener('pointermove', (e) => {
+  if (!path.drawing) return;
+  const p = tablePoint(e), l = path.drawing[path.drawing.length - 1];
+  if (p && Math.hypot(p[0] - l[0], p[1] - l[1]) > 0.002) { path.drawing.push(p); path.pts = pathSpaced(path.drawing); pathShow(); }
+});
+canvas.addEventListener('pointerup', () => {
+  if (!path.drawing) return;
+  pathSet(path.drawing); path.drawing = false;
+  path.draw = false; $('pDraw').classList.remove('on'); controls.enabled = true; hint('');
+});
+$('pShape').addEventListener('change', () => { if ($('pShape').value) pathShape($('pShape').value); $('pShape').value = ''; });
+on('pRun', pathRun);
+on('pClear', () => pathSet([]));
+
 function kinTapAt(p) {
   const i = kinInputs(), k = kinK();
   const f = fkFull(currentTarget());
@@ -1896,7 +2265,7 @@ function frame() {
   if (app.link === 'demo' && app.sim) {
     const S = app.sim;
     for (let left = Math.min(dt, 0.25); left > 1e-4; left -= 0.05) S.step(Math.min(left, 0.05));   // slow phones: substeps
-    Object.assign(app.q, S.q);
+    Object.assign(app.q, S.q); app.qT = now;
     app.pucks = S.pucks;
     const c = S.state();
     showCell({ ...c, note: S.world === 'manual'
@@ -1946,7 +2315,7 @@ resize();
 refreshEnabled();
 requestAnimationFrame(frame);
 
-window.scaraDebug = { app, cmd, setWorld, setDrive, runSpoken, handOn, handOff, keyVec, fkFull, ikBoth, solveKin, setKinInputs, kinTapAt, MG, trailCount: () => trailPts.length,
+window.scaraDebug = { app, cmd, demo, demoRun, path, pathSet, pathShape, pathRun, setWorld, setDrive, runSpoken, handOn, handOff, keyVec, fkFull, ikBoth, solveKin, setKinInputs, kinTapAt, MG, trailCount: () => trailPts.length,
   insetOff: () => insetOff, pad, setCamMode, camState: () => ({ mode: camMode, h: camH, rect: camRect }), ghostVisible: () => ghost.base.visible };
 const firstRun = !store.get('helpSeen', false);
 if (firstRun) $('helpSheet').hidden = false;          // first start: the short guide, then the connect sheet   // for tools/test_app.py

@@ -2,7 +2,7 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>scara_description</name>
-  <version>3.2.1</version>
+  <version>3.3.0</version>
   <description>SCARA robot digital twin: ROS 2 description, colour-sorting conveyor cell in Gazebo Harmonic and MuJoCo, real-robot firmware and camera cell, browser GUI and Android app (FK/IK, voice, hand control)</description>
   <maintainer email="Iamsubhani11@users.noreply.github.com">Shaik Subhani</maintainer>
   <author>Shaik Subhani</author>

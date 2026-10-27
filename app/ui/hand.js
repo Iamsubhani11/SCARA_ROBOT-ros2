@@ -37,9 +37,22 @@ class HandTracker {
     video.srcObject = this.stream;
     video.muted = true; video.playsInline = true;
     await video.play();
+    this.attach(video, view, onStatus);
+  }
+
+  /* use a camera that is already playing (handmp.js opens it and falls back to this tracker) */
+  attach(video, view, onStatus) {
+    this.video = video; this.view = view; this.onStatus = onStatus || (() => {});
     this.calibrate();
     clearInterval(this.timer);
     this.timer = setInterval(() => this.tick(), 66);
+  }
+
+  /* stop tracking but leave the camera to whoever opened it */
+  detach() {
+    clearInterval(this.timer); this.timer = 0;
+    this.state = 'off';
+    this.out = { x: 0, y: 0, fist: false, seen: false };
   }
 
   stop() {
@@ -74,12 +87,14 @@ class HandTracker {
     c.save(); c.translate(W, 0); c.scale(-1, 1); c.drawImage(v, 0, 0, W, H); c.restore();
     const img = c.getImageData(0, 0, W, H), px = img.data;
     const n = W * H, Y = new Float32Array(n), Cr = new Float32Array(n), Cb = new Float32Array(n);
+    let ySum = 0;
     for (let i = 0; i < n; i++) {
       const r = px[4 * i], g = px[4 * i + 1], b = px[4 * i + 2];
-      Y[i] = 0.299 * r + 0.587 * g + 0.114 * b;
+      Y[i] = 0.299 * r + 0.587 * g + 0.114 * b; ySum += Y[i];
       Cr[i] = 128 + 0.5 * r - 0.4187 * g - 0.0813 * b;
       Cb[i] = 128 - 0.1687 * r - 0.3313 * g + 0.5 * b;
     }
+    this.lastY = ySum / n;
     const bx0 = Math.round(W / 2 - BOX * H / 2), bx1 = Math.round(W / 2 + BOX * H / 2);
     const by0 = Math.round(H / 2 - BOX * H / 2), by1 = Math.round(H / 2 + BOX * H / 2);
     this.box = [bx0 / W, by0 / H, bx1 / W, by1 / H];        // for the big camera view (0..1, mirrored image)
@@ -91,17 +106,19 @@ class HandTracker {
       const left = 2.0 - (performance.now() - this.cal.t0) / 1000;
       this.onStatus(left > 0 ? `Hold your open hand in the square… ${left.toFixed(1)} s` : 'Learning…');
       if (left <= 0) {
+        this.calTries = (this.calTries || 0) + 1;
         const med = (a) => { const s = a.slice().sort((p, q) => p - q); return s[Math.floor(s.length / 2)] || 0; };
         const mad = (a, m) => med(a.map((v2) => Math.abs(v2 - m)));
         const cr = med(this.cal.cr), cb = med(this.cal.cb);
         this.skin = { cr, cb, dcr: Math.max(7, 2.6 * mad(this.cal.cr, cr) + 4), dcb: Math.max(7, 2.6 * mad(this.cal.cb, cb) + 4) };
         // plausible skin? (otherwise the square was empty or the light is very coloured)
         if (cr < 128 || cr > 185 || cb < 70 || cb > 135) {
-          this.onStatus('No hand in the square - try again'); this.calibrate(); return;
+          this.onStatus(this.tryAgainText()); this.calibrate(); return;
         }
         const mask = this.mask(Y, Cr, Cb);
         const blob = this.blobs(mask).find((bl) => bl.cx >= bx0 && bl.cx <= bx1 && bl.cy >= by0 && bl.cy <= by1);
-        if (!blob) { this.onStatus('No hand in the square - try again'); this.calibrate(); return; }
+        if (!blob) { this.onStatus(this.tryAgainText()); this.calibrate(); return; }
+        this.calTries = 0;
         this.openArea = blob.area;
         this.home = { x: W / 2, y: H / 2 };
         this.last = { x: blob.cx, y: blob.cy };
@@ -140,6 +157,15 @@ class HandTracker {
     const nx = (best.cx - this.home.x) / (W * 0.32), ny = -(best.cy - this.home.y) / (H * 0.32);
     this.out = { x: Math.max(-1, Math.min(1, nx)), y: Math.max(-1, Math.min(1, ny)), fist, seen: true };
     this.draw(img, mask, null, best);
+  }
+
+  /* why learning the hand failed, in plain words (the mean brightness of the last frame tells dark from coloured light) */
+  tryAgainText() {
+    const y = this.lastY || 128;
+    if (y < 45) return 'Too dark for the camera - turn on a light and hold your palm in the square';
+    if (y > 225) return 'Too bright (light behind you or in the camera) - turn so the light is on your hand';
+    return (this.calTries || 0) >= 2 ? 'Still no hand in the square: hold your open palm flat inside it, a plain wall behind'
+      : 'No hand in the square - try again';
   }
 
   mask(Y, Cr, Cb) {
@@ -202,5 +228,5 @@ class HandTracker {
   }
 }
 
-window.ScaraHand = new HandTracker();
+window.ScaraHandSkin = window.ScaraHand = new HandTracker();   // handmp.js wraps it with MediaPipe
 })();

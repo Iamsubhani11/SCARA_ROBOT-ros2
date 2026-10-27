@@ -1,5 +1,58 @@
 # Changes
 
+## 3.3.0 – 27 October 2026 – real hand tracking, new modes, hardware bring-up
+
+**New**
+* **Gesture control with MediaPipe** in the app and the website. MediaPipe Hand Landmarker finds 21
+  points on each hand; everything it needs (JavaScript, WebAssembly, the 7.8 MB model) is inside
+  `app/ui/lib/mediapipe`, so it works offline in the browser and in the Android app. The palm is the
+  left joystick (same still zone as before), a fist closes the gripper and an open hand opens it,
+  a **pinch** turns the hand into the right joystick (pinch and move up / down = height in XY drive),
+  and with **two hands** the second one is the right joystick. A hand only drives after it has been
+  in its circle once, so a new hand never makes the arm jump. The skeleton is drawn on the camera
+  picture and the window says which tracker runs. The old colour tracker is kept: it takes over by
+  itself if MediaPipe cannot start, and the ✋ button switches between them.
+* **The camera window says why** when gesture control cannot start: permission refused (browser or
+  Android), the page opened over plain http from another computer, no camera, camera busy, too dark
+  or too bright.
+* **Draw a path** (FK / IK tab): draw on the table with a finger or the mouse, or choose a circle,
+  square, star or figure 8. *Run path* moves the gripper along it with the inverse kinematics
+  (red parts are out of reach). Works offline, with MuJoCo, Gazebo and the real robot.
+* **Programs** (Teach tab): save the poses as a named program, load it, **export** it as a `.json`
+  file and **import** it again (the phone app saves the file on the PC in `~/scara_programs/`, or
+  shows it as text to copy when offline).
+* **Belt tracking** (Auto tab → *Follow belt*, command cell): the robot picks a puck from the
+  moving belt instead of stopping it. The puck's path is known from the camera and the belt speed;
+  the arm meets it and follows it down the belt with the Jacobian (resolved-rate: q̇ = J⁻¹·v) while it
+  goes down, closes and lifts. Offline, in MuJoCo (`launch_mujoco.py --command --track-belt`) and
+  Gazebo (`mode:=command track_belt:=true`). The belt only pauses while the arm is away at the bin.
+  It is for the command cell: in the sorting cell, where every puck is wanted and they come every
+  2.5 s, our tests showed it loses pucks, so sorting keeps stopping the belt.
+* **Demo for the review** (Auto tab): the table (the gripper draws a star, then moves a puck), the
+  sorting cell and the command cell ("red then blue", then belt tracking), one after another.
+* **Hardware bring-up check** `real_robot/scara_bringup.py`: the first start of the real robot step
+  by step – connection, homing, every joint's direction (saved for every program), gripper, relay,
+  and a digital-twin check. `--fake --yes` runs it with the software robot.
+* **docs/HARDWARE_GUIDE.md**: building and connecting the robot in one page, for both builds
+  (with limit switches, relay on A1 – or Mechamind-style without switches, relay on D10).
+
+**Fixed** (details and tests in docs/FIXED_BUGS.md, #33–#38)
+* Gazebo picked nothing and showed no pucks after `colcon build --symlink-install` – the programs
+  could not find the shared code through the symlinks (it looked like a Gazebo crash).
+* Gazebo's controllers sometimes did not start (slow first start, or an old Gazebo still running).
+  The spawners now wait 60 s and an old SCARA Gazebo is stopped first.
+* XY drive: the gripper turned while moving and the arm kept going after the stick was let go.
+* Tilt drive did nothing in new Chrome / Android WebView.
+* The digital-twin test failed on PCs where MuJoCo was installed with `pip install --user`.
+* The kinematics self-test only printed its numbers; it now checks them (and the Jacobian).
+* Offline simulator: a finger already beside a puck stopped the gripper from closing on it when the
+  puck was a few mm off centre (a real parallel gripper pushes it to the middle).
+
+**Checked automatically** – new tests: `tools/test_gesture_mediapipe.py` (a video made from real hand
+photos; MediaPipe offline from `file://` like the Android app and over http like the website),
+`tools/test_new_features.py` (paths, programs, belt tracking, demo), `MuJoCo belt tracking`
+(`sim_test_sorting.py` with `TRACK=1`), `hardware bring-up (software robot)`.
+
 ## 3.2.1 – 26 October 2026 – joysticks fixed on phones
 
 **Fixed**

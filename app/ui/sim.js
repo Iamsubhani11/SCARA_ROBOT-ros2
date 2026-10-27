@@ -46,6 +46,8 @@ class LocalSim {
     this.t = 0;
     this.nextSpawn = 0;
     this.n = 0;
+    this.track = false;         // belt tracking (command cell): pick from the moving belt
+    this.tracked = 0;
     this.setWorld('manual');
   }
 
@@ -282,6 +284,7 @@ class LocalSim {
     }
     if (a.phase === 'watch') {
       this.belt = true;
+      if (this.track && this.world === 'command' && this.trackStart(a)) return;
       const [lo, hi] = this.cell.pick_window;
       const hit = this.pucks.find((p) => !p.held && Math.abs(p.z - this.sc.belt_top) < 0.005
         && this.beltS(p.x, p.y) >= lo && this.beltS(p.x, p.y) <= hi + 0.02 && this.wants(p.c));
@@ -299,6 +302,8 @@ class LocalSim {
       a.plan = plan.concat(this.planReady());
       a.phase = 'pick';
       this.log(`Picking ${p.c} puck`);
+    } else if (a.phase === 'trackGo' || a.phase === 'track') {
+      this.trackStep(a, dt);
     } else if (a.phase === 'pick') {
       if (this.runPlan(dt)) {
         const p = a.puck;
@@ -309,6 +314,64 @@ class LocalSim {
         }
         a.phase = 'watch';
       }
+    }
+  }
+
+  /* ---- belt tracking (command cell), like common/scara_sorter_core.py: a wanted puck that comes
+     alone is met at s = -0.12 (just above its handle) and followed down the belt while the gripper
+     goes down, closes and lifts - the belt keeps running. It only pauses while the arm carries the puck to the bin. */
+  trackStart(a) {
+    const want = this.pucks.filter((p) => !p.held && Math.abs(p.z - this.sc.belt_top) < 0.005 && this.wants(p.c)
+      && this.beltS(p.x, p.y) > -0.55 && this.beltS(p.x, p.y) < this.cell.pick_window[1]);
+    if (want.length !== 1) return false;               // none, or several close together: stop the belt as usual
+    const p = want[0], s = this.beltS(p.x, p.y);
+    if (s > -0.2 || s < -0.3) return false;            // meet it at -0.12: start when it is 0.1-0.2 m before that
+    const [mx, my] = this.beltPoint(-0.12), lat = this.beltLat(p.x, p.y);
+    // the puck is round: any gripper direction will do - the present one, or pointing away from the
+    // column, or sideways (whichever the joints can reach)
+    const yaws = [this.fk(this.target).yaw, this.k.base_yaw, this.k.base_yaw + Math.PI / 2, this.k.base_yaw - Math.PI / 2];
+    let above = null;
+    for (const yw of yaws) { above = this.ik(mx - this.cell.dir[1] * lat, my + this.cell.dir[0] * lat, yw, this.target, Math.PI); if (above) break; }
+    if (!above) return false;
+    // wait just above the puck handles (not at travel height): Z then only has 7 cm to go down,
+    // which it can do in 1 s within its speed limit (0.08 m/s)
+    const zPre = this.sc.belt_top + this.cell.handle_top + 0.02 - this.sc.table_top - this.k.pad_bottom_z0;
+    Object.assign(this.target, { column_joint: above.column_joint, forearm_joint: above.forearm_joint, wrist_joint: above.wrist_joint,
+      shoulder_joint: zPre, left_finger_joint: 0 });
+    a.zPre = zPre;
+    a.phase = 'trackGo'; a.puck = p;
+    this.log(`Following the belt to pick the ${p.c} puck (belt keeps running)`);
+    return true;
+  }
+
+  trackStep(a, dt) {
+    const p = a.puck, s = this.beltS(p.x, p.y);
+    if (a.phase === 'trackGo') {
+      if (s < -0.12) return;                           // the arm waits above the meeting point
+      a.phase = 'track'; a.t0 = this.t;
+    }
+    const t = this.t - a.t0, DOWN = 1.0, CLOSE = 1.0, UP = 0.8, z0 = a.zPre;
+    const zPick = Math.max(p.z + 0.006 - this.sc.table_top - this.k.pad_bottom_z0, this.sc.limits.shoulder_joint[0] + 0.002);
+    // aim where the puck will be 0.1 s from now, plus the gap the pad still lags behind it (a little
+    // feedback): the fingers have only 10 mm of room on each side, a few mm off and one lands on the rim
+    const lead = p.held ? 0 : 0.1 * this.cell.speed, f = this.fk(this.q);
+    const ex = p.held ? 0 : 0.5 * (p.x - f.x), ey = p.held ? 0 : 0.5 * (p.y - f.y);
+    const s2 = this.ik(p.x + this.cell.dir[0] * lead + ex, p.y + this.cell.dir[1] * lead + ey, this.fk(this.target).yaw, this.target, Math.PI);
+    if (!s2 || t > DOWN + CLOSE + UP + 1.5) { this.log('Belt tracking: lost the puck - looking again'); this.target.left_finger_joint = 0; a.phase = 'watch'; return; }
+    let z = z0;
+    if (t < DOWN) z = z0 + (zPick - z0) * t / DOWN;
+    else if (t < DOWN + CLOSE) { z = zPick; this.target.left_finger_joint = this.sc.grip_close; }
+    else z = zPick + (z0 - zPick) * Math.min(1, (t - DOWN - CLOSE) / UP);
+    if (!p.held) Object.assign(this.target, { column_joint: s2.column_joint, forearm_joint: s2.forearm_joint, wrist_joint: s2.wrist_joint });
+    this.target.shoulder_joint = z;
+    if (t >= DOWN + CLOSE + UP) {
+      if (!p.held) { this.log(`Missed the ${p.c} puck on the moving belt - will look again`); this.target.left_finger_joint = 0; a.phase = 'watch'; return; }
+      this.tracked += 1;
+      this.belt = false;                               // pause while the arm is away at the bin
+      const bin = { xy: this.sc.command_bin.xy, yaw: this.sc.command_bin.yaw };
+      const plan = this.planPick({ x: p.x, y: p.y, z: p.z }, { x: bin.xy[0], y: bin.xy[1] }, this.sc.table_top + this.cell.bin_floor, bin.yaw);
+      a.plan = (plan ? plan.slice(7) : []).concat(this.planReady());     // only the "to the bin" part: the puck is in the hand
+      a.phase = 'pick';
     }
   }
 
@@ -374,7 +437,11 @@ class LocalSim {
     if (this.mode !== 'off' || this.running) {
       for (const p of this.pucks) {
         if (p === this.held || p.held) continue;
-        if (this.fingerOver(this.q, p)) floor = Math.max(floor, p.z + this.sc.puck_height + 0.002);
+        // a pad already down beside a puck that sits between the fingers is not ON it: closing then
+        // just pushes the puck to the middle (a real parallel gripper centres it) - only a pad
+        // coming down on top of a puck is stopped
+        const beside = this.between(this.q, p) && this.padZ(this.q) < p.z + this.sc.puck_height - 0.004;
+        if (!beside && this.fingerOver(this.q, p)) floor = Math.max(floor, p.z + this.sc.puck_height + 0.002);
       }
     }
     const zMin = Math.max(floor - this.sc.table_top - this.k.pad_bottom_z0, this.sc.limits.shoulder_joint[0]);
@@ -411,7 +478,7 @@ class LocalSim {
     return {
       joints: { ...this.q }, pucks: this.pucks.map((p) => ({ c: p.c, x: p.x, y: p.y, z: p.z })), running: this.running,
       active: [...this.active], sequence: this.countLeft === 1 && this.active.size === 1 && !this.active.has('any') ? [...this.active, ...this.queue] : [],
-      sorted: this.sorted, world: this.world, note: this.note,
+      sorted: this.sorted, world: this.world, note: this.note, tracking: this.track, tracked: this.tracked,
     };
   }
 }

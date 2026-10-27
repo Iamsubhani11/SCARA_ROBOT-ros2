@@ -26,10 +26,12 @@ One robot description feeds every simulator, and one twin server connects them t
 * **Digital twin** – the real robot copies the simulation, or the simulation follows the robot;
   with the webcam cell the 3-D view shows the real conveyor and every cube the camera sees.
 * **One app, phone and PC** – Android APK and browser GUI are the same program: joysticks,
-  FK / IK, voice, gesture control, joysticks and sliders, dark / light, teach & replay, an offline
-  simulator that needs no PC.
+  FK / IK, voice, **MediaPipe hand tracking** (offline, one or two hands), sliders, dark / light,
+  teach & replay with **programs you can export and import**, **draw a path** for the gripper,
+  **belt tracking** and a **demo for the review** – and an offline simulator that needs no PC.
 * **Real hardware** – Arduino firmware (CNC shield, A4988, limit-switch homing), a webcam cell
-  that needs no depth camera, and a safety filter in front of every manual move.
+  that needs no depth camera, a safety filter in front of every manual move, and a step-by-step
+  **bring-up check** for the day you build it ([docs/HARDWARE_GUIDE.md](docs/HARDWARE_GUIDE.md)).
 
 ## Highlights
 
@@ -229,6 +231,38 @@ The folders are explained in [Project layout](#project-layout).
 Only one program should move the arm at a time. That is why the keyboard, pad, gestures and GUI
 use `mode:=manual` in Gazebo – no sorter runs there. No hardware yet? `--fake` (GUI) or
 `fake:=true` (launch files) starts a software copy of the robot firmware.
+
+### 3.1 Every mode – from the app / website, or from a terminal
+
+Start **one** server and you can reach every mode from the app and the website; or start each mode
+on its own in a terminal. Both ways do the same thing.
+
+```bash
+python3 server/scara_twin_server.py                         # MuJoCo (all three worlds)
+python3 server/scara_twin_server.py --sim gazebo --world sort   # Gazebo (the server starts it)
+```
+Then http://localhost:8080 on the PC, or the phone app → the PC's address, port 9090.
+
+| mode | in the app / website | in a terminal instead |
+|---|---|---|
+| Table (manual picking) | Auto tab → **Table**; Manual tab drives | `gazebo.launch.py mode:=manual` · `launch_mujoco.py` |
+| Sorting cell | Auto tab → **Sorting** → Start | `gazebo.launch.py` · `launch_mujoco.py --auto --show` |
+| Command cell | Auto tab → **Command**, colours / sequence / typed / spoken | `gazebo.launch.py mode:=command` + `scara_ask.py` · `launch_mujoco.py --command` |
+| Belt tracking (3.3) | Command cell → **Follow belt** | `... mode:=command track_belt:=true` · `launch_mujoco.py --command --track-belt` |
+| Joysticks: joints / XY + height | Manual tab | `scara_teleop.py` · `scara_mujoco_teleop.py` (keyboard) |
+| Sliders | Manual tab → Sliders (PC: always shown) | – |
+| Keyboard / gamepad | just use it on the page (also a keyboard or pad on the phone) | `scara_joystick.py` · `scara_mujoco_joystick.py` |
+| Gesture (MediaPipe, 3.3) | **Gesture** button | `gesture_control_ros2.py` · `gesture_control_mujoco.py` |
+| Voice | microphone button / *Speak* | `scara_ask.py --voice` · `launch_mujoco.py --command --voice` |
+| Tap to move a puck | Manual tab → *Tap to move a puck* | – |
+| FK / IK, go to a point | FK / IK tab | – |
+| Draw a path (3.3) | FK / IK tab → *Draw on the table* or a shape → *Run path* | – |
+| Teach, programs (3.3) | Teach tab: save poses, Play / Loop, programs, Export / Import | – |
+| Demo for the review (3.3) | Auto tab → **Demo for the review** | – |
+| Real robot / digital twin | Robot tab → Connect → Home → **Twin** at the top | `scara_twin_server.py --port /dev/ttyACM0` |
+| Real camera cell | Robot / Auto tabs | `scara_hw_cell.py --port /dev/ttyACM0` |
+| First start of the real robot | – | `real_robot/scara_bringup.py --port /dev/ttyACM0` |
+| Offline, no PC | **Try offline** (all of the above except the real robot) | – |
 
 ---
 
@@ -521,25 +555,100 @@ Offline speech recognition). In a browser it uses Chrome / Edge speech (online, 
 
 Common mishearings are fixed for you ("read" → red, "blew" → blue, "grin" → green).
 
-### Gesture (hand) control
+### Gesture (hand) control – MediaPipe
 
-**Gesture** – the button under the 3-D view (also in the Manual tab) – uses the front camera (laptop webcam on a PC) – no internet, no model files.
-Hold your open palm in the yellow square for two seconds; the app learns your skin colour under your
-light and the size of your open hand. Then:
+<img src="docs/media/gesture_mediapipe.png" width="720" alt="Gesture camera with the MediaPipe hand skeleton of two hands">
 
-* hand in the middle – the arm stays still; move it left / right / up / down – the left joystick
-  moves that way, faster the further you go;
-* **fist** – close the gripper; **open hand** – open it.
+**Gesture** – the button under the 3-D view (also in the Manual tab) – uses the front camera (the
+webcam on a PC). Since 3.3 it uses **MediaPipe Hand Landmarker**: 21 points on each hand, drawn on the
+picture as a skeleton. It runs on the phone or PC itself, with no internet – the program and the model
+are inside the app (`app/ui/lib/mediapipe`).
 
-The camera opens in its own place (above the robot view on a phone, top of the right column on a
-PC; *Window* / *Small* / ✕ in its title bar), and the picture shows what the tracker sees: the learn
-square, the still zone, your hand and open / fist. *Learn again* (or a double-tap on the picture)
-re-calibrates. A plain background and even light work best. (The full two-hand MediaPipe gesture
-control for the PC is in section 7.)
+| your hand | the robot |
+|---|---|
+| palm in the middle circle | the arm stays still (a new hand first has to come to its circle) |
+| move it left / right / up / down | the **left joystick** – faster the further you go |
+| **fist** | close the gripper (hold it 0.3 s) |
+| **open hand** | open the gripper |
+| **pinch** (thumb + index) and move | the **right joystick** from where you pinched – in *XY + height* drive: up / down = height |
+| **two hands** | left of the picture = left joystick, right of the picture = right joystick |
+
+The window says which tracker runs (*MediaPipe hand tracking* in blue). If MediaPipe cannot start
+(a very old phone, or `index.html` opened straight from a file in a normal browser), the old
+**colour tracker** takes over by itself – hold your open palm in the yellow square for two seconds –
+and the window says so. The ✋ button switches between them. If the camera cannot start, the window
+says why in plain words:
+
+| the window says | why / what to do |
+|---|---|
+| *Camera permission was refused* | allow the camera (address-bar icon; Android: Settings ▸ Apps ▸ SCARA Digital Twin ▸ Permissions) |
+| *The browser only allows the camera on http://localhost, on https or in the Android app* | the website was opened from another computer over plain http – open it on the PC itself, or use the phone app |
+| *The camera is busy* | close other apps / tabs that use it |
+| *No hand seen – too dark / too much light behind you* | light on your hand, not behind it |
+
+The camera window keeps its place (above the robot view on a phone, top of the right column on a
+PC; *Window* / *Small* / ✕ in its title bar). (The two-hand gesture program for MuJoCo and Gazebo
+without the app is in section 7.)
+
+### Draw a path (FK / IK tab)
+
+<img src="docs/media/app_path.png" width="720" alt="FK / IK tab: a star drawn on the table, the gripper following it">
+
+*Draw on the table* and draw with one finger (or the mouse) in the 3-D view, or pick a **circle,
+square, star or figure 8**. The path is drawn on the table – yellow where the arm can reach, red where
+it cannot. *Run path* first goes to its start, then moves the gripper along it at its present height,
+solving the inverse kinematics for every point 4 mm apart (5 cm/s at 100 % speed, *Loop* to repeat).
+It sends the same joint targets as the XY drive, so it works offline, in MuJoCo, in Gazebo and on the
+real robot.
+
+### Programs (Teach tab)
+
+The poses in the Teach tab are a **program**. *Save as program* keeps it under a name on this device,
+*Load* puts it back into the list (then *Play* / *Loop*), *Export file* downloads it as a `.json` file
+and *Import file* reads one back. The phone app cannot download files: connected, *Export* saves it on
+the PC in `~/scara_programs/`; offline it shows the text to copy, and *Import* takes pasted text.
+
+```json
+{"scara_program": 1, "name": "stack_3",
+ "poses": [{"column_joint": 0.3, "shoulder_joint": -0.05, "forearm_joint": 0.6, "wrist_joint": 0.0, "left_finger_joint": 0.0}]}
+```
+
+### Belt tracking (Auto tab, command cell)
+
+<img src="docs/media/app_tracking.png" width="720" alt="Command cell: the gripper going down on a red puck while the belt keeps running">
+
+*Follow belt*: instead of stopping the belt for every pick, the robot meets the puck on the moving
+belt and follows it while it goes down, closes and lifts. The camera gives the puck's place, the belt
+speed is known, so its path is a straight line `p(t) = p₀ + v·t`. The arm follows it with the
+**Jacobian** (resolved-rate control, `common/scara_kinematics.py`, `track_line`):
+
+    q(k+1) = q(k) + J⁻¹(q(k)) · ( v + (p_wanted − p_now) / Δt ) · Δt,     det J = L1 · L2' · sin θ2
+
+(L2' = L2 + LT = 169.9 mm, the elbow-to-pad length with the wrist at 0; det J = 0 is the straight arm,
+where tracking is refused.)
+
+The belt only pauses while the arm carries the puck to the bin. It is meant for the **command
+cell**: a wanted puck that comes alone is followed; when wanted pucks crowd together, or in the
+sorting cell (every puck wanted, one every 2.5 s), stopping the belt is better – our tests lost pucks
+there – so the robot does that. Tested in MuJoCo (`MuJoCo belt tracking` in `run_all_tests.sh`) and
+offline (`test_new_features.py`).
+
+### Demo for the review (Auto tab)
+
+One button for the presentation: the **table** (the gripper draws a star, then carries a puck to a new
+place), the **sorting cell** (about 50 s) and the **command cell** ("red then blue", then every colour
+with belt tracking). Each world switch takes a moment (Gazebo restarts, about 30 s). Tap the button
+again, or STOP, to end it.
 
 ---
 
 ## 10. The real robot
+
+> **Building it now?** [docs/HARDWARE_GUIDE.md](docs/HARDWARE_GUIDE.md) is the one-page, step-by-step
+> version: which build (with limit switches, or Mechamind-style without them – that decides the relay
+> pin), the wiring, flashing, and `python3 real_robot/scara_bringup.py`, which checks the robot one
+> thing at a time (connection, homing, each joint's direction, gripper, relay, digital twin) and tells
+> you what to fix.
 
 It is the HowToMechatronics SCARA: Arduino UNO, CNC Shield V3, 4 × A4988 drivers at ¼ step,
 4 × NEMA 17, 4 limit switches and an MG996R servo gripper – plus a relay for the conveyor.
@@ -817,10 +926,11 @@ Blender letters into the arm too, import both, join them (Ctrl+J) and export as
 
 | program | options |
 |---|---|
-| `mujoco/launch_mujoco.py` | `--auto` · `--command` · `--voice` · `--show` · `--gui` · `--open` · `--llm` · `--stt` · `--keep-in-bins` · `--capacity N` · `--seed N` · `--twin PORT\|fake` |
+| `mujoco/launch_mujoco.py` | `--auto` · `--command` · `--voice` · `--show` · `--gui` · `--open` · `--llm` · `--stt` · `--keep-in-bins` · `--capacity N` · `--seed N` · `--twin PORT\|fake` · `--track-belt` (command cell: belt tracking) |
 | `server/scara_twin_server.py` | `--sim mujoco\|gazebo\|hardware\|none` · `--port PORT` · `--fake` · `--mode sort\|command` and `--source CAM` (hardware) · `--http 8080` · `--app-port 9090` · `--open` (open the browser) |
 | `real_robot/scara_hw_cell.py` | `--port` · `--fake` · `--mode sort\|command` · `--source CAM` · `--teach` · `--zero-here` |
 | `real_robot/scara_camera_setup.py` | `--source CAM` · `--distance 60` · `--config FILE` |
+| `real_robot/scara_bringup.py` | `--port PORT` · `--no-switches` · `--fake` · `--yes` · `--report FILE` – first start of the real robot, step by step |
 | `gazebo/scara_ask.py` | `--voice` · `--llm` · `--stt` · `--quiet` |
 | `gazebo/scara_teleop.py`, `mujoco/scara_mujoco_teleop.py` | `--safety safe\|normal\|off` · `--no-assist` |
 | `gazebo/scara_joystick.py`, `mujoco/scara_mujoco_joystick.py` | `--device` · `--layout xbox\|gamecontroller` · `--joy-topic` · `--safety` · `--no-assist` (MuJoCo: `--twin`) |
@@ -904,15 +1014,22 @@ it – run the tests before every commit and no old bug comes back.
 | `tools/test_firmware_host.py` | compiles the Arduino sketch on the PC (3 variants) and drives it over its serial protocol |
 | `tools/test_gesture_core.py` | two-hand gestures with synthetic hands |
 | `tools/test_app_v3.py` | the app / website offline: worlds, voice, sliders, keyboard, gesture (with `make_hand_video.py`), FK / IK, recording, every phone width, dark / light, arm-camera resize |
+| `tools/test_gesture_mediapipe.py` | MediaPipe hand tracking with a video made from real hand photos (`make_hand_video.py --real`): offline from `file://` like the Android app and over http like the website; the hand moves the column, fist / open close and open the gripper, a second hand is the right joystick, the tracker switch, and the on-screen reasons for a refused camera and plain http |
+| `tools/test_new_features.py` | 3.3 in the app offline: a drawn / star path is followed (within 6 mm), out-of-reach paths refused, programs saved / exported / imported / loaded, a broken file refused, belt tracking picks from the moving belt, the review demo runs and stops |
+| `real_robot/scara_bringup.py --fake --yes` | the hardware bring-up check against the software robot |
 | `tools/test_camera_gamepad.py` | gesture camera Docked / Window / Small / closed on phone, tablet and PC (never covers or shrinks the robot view) and a gamepad driving the arm and the gripper |
 | `tools/test_hw_twin.py` | the webcam cell as a twin: belt from the taught poses, cubes where they are, IK Go on the robot |
 | `tools/test_twin_e2e.py` | the digital twin: MuJoCo + software robot – Twin moves, robot limits, direction check, STOP, robot not answering, worlds, the app |
-| `tools/sim_test_manual.py`, `sim_test_sorting.py`, `test_hw_cell.py` | MuJoCo physics: manual picks, sorting and command cells, the webcam cell (through `tools/mujoco_harness.py`) |
+| `tools/sim_test_manual.py`, `sim_test_sorting.py`, `test_hw_cell.py` | MuJoCo physics: manual picks, sorting and command cells, belt tracking (`TRACK=1`: most picks on the moving belt, nothing lost), the webcam cell (through `tools/mujoco_harness.py`) |
 | `tools/test_gazebo.py` | Gazebo through the server, headless: picks with the twin, world switches, nothing left over, clean stop |
 
 `python3 tools/make_app_media.py` re-makes the README pictures of the app.
 
-What was run for this release:
+What was run for 3.3.0 (27 October 2026, Ubuntu 22.04, ROS 2 Humble, Gazebo Harmonic 8.15, MuJoCo
+3.12, Chromium 156 through Playwright): the full `tools/run_all_tests.sh` – the summary is in
+CHANGELOG.md. Before the changes the same suite on this PC gave 13 passed, 4 failed (bugs #33–#36).
+
+What was run for earlier releases:
 * Gazebo Harmonic (headless, the Jazzy builds of ros_gz and gz_ros2_control) with the real launch
   file in all three modes: belt, pucks, controllers, sorter, command mode, manual control through
   the twin server, and the doctor script.
@@ -937,6 +1054,17 @@ What was run for this release:
 
 ## 17. Troubleshooting
 
+**Gazebo "crashes" / the arm does not move** – usually Gazebo itself is fine and a node behind it
+stopped. Look in the terminal for the first `process has died`:
+* `scara_color_sorter.py` / `scara_vision_node.py` / `scara_puck_spawner.py` died with
+  `ModuleNotFoundError` – a build from before 3.3 with `--symlink-install` (bug #36): update, then
+  `colcon build --symlink-install` again.
+* the `spawner` processes died – the controllers did not come up. 3.3 waits 60 s and first stops an
+  old SCARA Gazebo that was still running (`stop_old:=false` turns that off). Still failing:
+  `pkill -f "gz sim"`, then launch again.
+* Gazebo's own window closes with an OpenGL / Ogre error – a graphics-driver problem: try
+  `headless:=true`, or `export LIBGL_ALWAYS_SOFTWARE=1` before the launch.
+
 **Gazebo: belt / pucks / arm don't move** – run `python3 gazebo/scara_doctor.py` and fix the first
 FAIL. The usual ones: the gz_ros2_control plugin is not found (section 2.3), Gazebo is paused (press
 ▶), no camera images (GPU driver), an old build (`colcon build` again).
@@ -952,8 +1080,10 @@ FAIL. The usual ones: the gz_ros2_control plugin is not found (section 2.3), Gaz
   http://localhost:8080 (it connects by itself), or tap the pill and connect.
 * **Voice: "needs internet" / nothing happens** – in a browser speech is online and needs
   localhost or https; on the phone install offline speech (section 9). You can always type.
-* **Gesture control: "No hand in the square"** – fill the square with your open palm, plain
-  background behind it, then *Learn again*. Strongly coloured light confuses it.
+* **Gesture control does nothing** – read the text in the camera window: it says why (camera refused,
+  plain http from another computer, no hand seen, too dark). The blue *MediaPipe hand tracking* label
+  means the real hand tracker runs; with *Simple colour tracking* fill the yellow square with your open
+  palm, plain background behind it, then *Learn again*.
 * **Gazebo world switch takes long** – it restarts Gazebo (about 30 s); the overlay says so.
 * **Phone app doesn't connect** – same Wi-Fi, `sudo ufw allow 9090`, and only one of
   `scara_twin_server.py` / `rosbridge_server` running.

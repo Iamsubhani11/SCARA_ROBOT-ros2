@@ -1,4 +1,4 @@
-# SCARA Digital Twin – phone app and browser GUI (v3.2)
+# SCARA Digital Twin – phone app and browser GUI (v3.3)
 
 `SCARA_Digital_Twin_v3.apk` – same name and package as before (`com.iamsubhani.scaradigitaltwin`),
 rebuilt from scratch. It drives the MuJoCo or Gazebo simulation on your PC, the real robot, or both
@@ -8,9 +8,14 @@ phone itself, no PC needed.
 The same page is the PC GUI: `python3 server/scara_twin_server.py` serves it at http://localhost:8080
 and connects it by itself. New in v3: the **FK / IK** tab, **voice** commands, **hand control** with the
 front camera, exact-position sliders, the keyboard, the activity log, Gazebo world switching, and the
-real webcam cell drawn as it stands on the table (`--sim hardware`).
+real webcam cell drawn as it stands on the table (`--sim hardware`). New in 3.3: **MediaPipe hand
+tracking** (offline, one or two hands, pinch), **Draw a path**, **programs** you can export and import,
+**belt tracking** and a **demo for the review**.
 
 ## Install
+
+Version 3.3 installs over 3.x – no need to uninstall. It is bigger than before (11 MB, was 1.2 MB) because
+MediaPipe's program and hand model are inside it, so hand tracking works without internet.
 
 Uninstall the old app (v1.0 / v1.1) first – the new APK is signed with a different key and Android
 refuses to install it on top. Then open the APK on the phone and allow "install unknown apps" for
@@ -77,6 +82,12 @@ little and go down again. The phone buzzes when it grabs.
 * **Build a sequence**: tap colours in the order you want, then **Run sequence** – one of each, in that order.
 * **Command box**: type, or dictate with the microphone on your keyboard: `red`, `3 green`,
   `red then blue then green`, `any`, `none`, `start`, `stop`.
+* **Follow belt** (command cell): the robot picks a wanted puck from the moving belt instead of
+  stopping it – it follows the puck with the Jacobian while it goes down, closes and lifts. The belt
+  only pauses while the arm is at the bin. In the sorting cell it keeps stopping the belt (every puck
+  is wanted there and they come too close together).
+* **Demo for the review**: the table (draws a star, moves a puck), the sorting cell and the command
+  cell with belt tracking, one after another. Tap again or STOP to end it.
 * The chips show what is being picked, the sequence still to come, and the totals (R G B Y).
 * Offline only: **Add a puck**, **Reset**, and picks per minute.
 
@@ -85,6 +96,10 @@ little and go down again. The phone buzzes when it grabs.
 Move the arm, **Save this pose**, repeat. **Play** runs the poses in order (with the gripper as saved),
 **Loop** repeats them until **Stop**. Each pose has **Go** and **Delete**. Offline the poses are kept on
 the phone; connected, they are kept on the PC (`~/.scara_teach_points.json`).
+
+**Programs**: *Save as program* keeps the poses under a name, *Load* brings them back, *Export file*
+downloads a `.json` file (in the phone app: saved on the PC in `~/scara_programs/`, or shown as text
+to copy when offline), *Import file* reads one back (the phone app takes pasted text).
 
 ## FK / IK tab
 
@@ -95,6 +110,10 @@ the column axis, x along the arm at θ1 = 0) or the **World** frame of the simul
 and both elbow solutions appear with every joint value. A joint past its limit is red and that
 solution cannot be sent; **Go** on the other one moves the arm there. The area the gripper can reach
 (joint limits included) is shaded on the table.
+
+**Draw a path**: *Draw on the table* and draw with a finger, or pick a circle, square, star or figure 8.
+Red parts are out of reach. *Run path* goes to the start and moves the gripper along the path at its
+present height (inverse kinematics for every point, 4 mm apart); *Loop* repeats it.
 
 **Motion graph**: the four joints over the last 10 s. **Record**, move the arm, **Stop recording**,
 **Save CSV** – a table of time, joints and gripper position for the graphs in a report (the website
@@ -108,9 +127,18 @@ recogniser – offline when offline speech is installed (Google app ▸ Settings
 blue", "3 green", "any", "stop picking", "start", "stop", "open", "close", "home", "sorting", "command",
 "table", "emergency stop", "resume".
 
-**Gesture** (button under the 3-D view, or in the Manual tab): allow the camera, hold your open palm in the yellow square for 2 s. Then your
-hand is the left joystick – middle = still, move it to move the arm; a fist closes the gripper, an
-open hand opens it. *Learn again* re-calibrates. Plain background and even light work best.
+**Gesture** (button under the 3-D view, or in the Manual tab): allow the camera (the app asks for it
+the first time and uses the front camera). **MediaPipe** finds your hand and draws its 21 points:
+
+* palm in the middle circle = still; move it = the **left joystick**;
+* **fist** closes the gripper, **open hand** opens it;
+* **pinch** (thumb + index) and move = the **right joystick** (in *XY + height*: up / down = height);
+* **two hands**: the one on the right of the picture is the right joystick.
+
+A hand starts driving only after it has been in its circle once. If MediaPipe cannot start, the
+simple **colour tracker** takes over (hold your open palm in the yellow square for 2 s); the ✋ button
+switches between them, and the window always says which one runs – or why the camera did not start
+(permission, plain http from another computer, camera busy, too dark).
 
 ## Robot tab (needs the PC)
 

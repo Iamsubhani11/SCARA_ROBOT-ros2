@@ -20,7 +20,7 @@ Safety mode (common/scara_safety.py): slow joints + gentle gripper, pick assist
 a guard against pressing a finger down on a puck, table floor, emergency stop.
 """
 import os as _os, sys as _sys  # noqa: E401 - the other folders of this package (common/, mujoco/ ...)
-_sys.path[:0] = [_os.path.join(_os.path.dirname(_os.path.abspath(__file__)), '..', _d)
+_sys.path[:0] = [_os.path.join(_os.path.dirname(_os.path.realpath(__file__)), '..', _d)
                  for _d in ('common', 'mujoco', 'gazebo', 'real_robot', 'server', 'gesture_control')]
 import os
 import sys
