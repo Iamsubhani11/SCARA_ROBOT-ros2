@@ -85,7 +85,8 @@ little and go down again. The phone buzzes when it grabs.
 * **Follow belt** (command cell): the robot picks a wanted puck from the moving belt instead of
   stopping it – it follows the puck with the Jacobian while it goes down, closes and lifts. The belt
   only pauses while the arm is at the bin. In the sorting cell it keeps stopping the belt (every puck
-  is wanted there and they come too close together).
+  is wanted there and they come too close together). It works offline and with MuJoCo; with Gazebo
+  it is switched off for now (the app says so) and the belt stops for every pick.
 * **Demo for the review**: the table (draws a star, moves a puck), the sorting cell and the command
   cell with belt tracking, one after another. Tap again or STOP to end it.
 * The chips show what is being picked, the sequence still to come, and the totals (R G B Y).

@@ -243,8 +243,11 @@ def main():
                 cmd('belt_tracking', on=False)
                 st = wait(lambda s: s['sim'].get('tracking') is False, 10)
                 check(st['sim'].get('tracking') is False, 'belt tracking off again')
-        st = state()
-        check(len(st['sim'].get('pucks') or []) == 6, 'table world: the 6 table pucks, nothing from the command cell')
+        # the table's pucks are reported a moment after the world has started: wait for them, then
+        # there must be exactly 6 (more = something left over from the command cell, bug 4)
+        st = wait(lambda s: len(s['sim'].get('pucks') or []) >= 6, 10)
+        n = len(st['sim'].get('pucks') or [])
+        check(n == 6, f'table world: the 6 table pucks, nothing from the command cell ({n})')
         cmd('control', mode='both')
         asyncio.run(browser())
         # the app draws the conveyor cell's pucks too (sorting world, belt running)

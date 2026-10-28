@@ -77,14 +77,12 @@ def main():
         sj, rj = st['sim']['joints'], st['robot']['joints']
         diff = max(abs(sj[k] - rj[k]) for k in ('column_joint', 'forearm_joint', 'wrist_joint'))
         check(diff < 0.25, f'the robot follows the Gazebo arm (largest difference {diff:.3f} rad, mid-move allowed)')
-        # 3.3 belt tracking in Gazebo: one colour (so a wanted puck comes alone), picked from the moving belt
+        # 3.3 belt tracking is switched off in Gazebo (tested: its controller lag changes from pick to
+        # pick, 1 of 6 held); asking for it must say so and leave the sorter stopping the belt as before
         r = cmd('belt_tracking', on=True)
-        cmd('pick', color='red')
-        st = wait(lambda s: s['sim'].get('tracking') is True, 20)
-        check(r.get('ok') and st['sim'].get('tracking') is True, 'Gazebo: belt tracking on (sorter reports it)')
-        st = wait(lambda s: (s['sim'].get('tracked') or 0) >= 1, 300, step=5)
-        check((st['sim'].get('tracked') or 0) >= 1, f'Gazebo: {st["sim"].get("tracked")} red puck(s) picked from the moving belt')
-        cmd('belt_tracking', on=False)
+        st = api('/api/state')
+        check(not r.get('ok') and 'Gazebo' in (r.get('error') or '') and not st['sim'].get('tracking'),
+              f'Gazebo: belt tracking refused with a reason, the belt still stops for picks ({(r.get("error") or "")[:60]}...)')
         for w in ('manual', 'sort'):
             cmd('world', world=w)
             st = wait(lambda s: s['sim'].get('world') == w and not s['sim'].get('switching') and s['sim'].get('joints'), 240)

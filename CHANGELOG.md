@@ -24,8 +24,11 @@
 * **Belt tracking** (Auto tab → *Follow belt*, command cell): the robot picks a puck from the
   moving belt instead of stopping it. The puck's path is known from the camera and the belt speed;
   the arm meets it and follows it down the belt with the Jacobian (resolved-rate: q̇ = J⁻¹·v) while it
-  goes down, closes and lifts. Offline, in MuJoCo (`launch_mujoco.py --command --track-belt`) and
-  Gazebo (`mode:=command track_belt:=true`). The belt only pauses while the arm is away at the bin.
+  goes down, closes and lifts. The belt speed is measured by the camera. Offline and in MuJoCo
+  (`launch_mujoco.py --command --track-belt`). The belt only pauses while the arm is away at the bin.
+  **Switched off in Gazebo for now**: Gazebo's arm controller lags its trajectory by an amount that
+  changes from pick to pick; with a fixed 0.2 s lead 1 of 6 tracked picks held. Gazebo keeps stopping
+  the belt (README section 9).
   It is for the command cell: in the sorting cell, where every puck is wanted and they come every
   2.5 s, our tests showed it loses pucks, so sorting keeps stopping the belt.
 * **Demo for the review** (Auto tab): the table (the gripper draws a star, then moves a puck), the
@@ -52,6 +55,12 @@
 photos; MediaPipe offline from `file://` like the Android app and over http like the website),
 `tools/test_new_features.py` (paths, programs, belt tracking, demo), `MuJoCo belt tracking`
 (`sim_test_sorting.py` with `TRACK=1`), `hardware bring-up (software robot)`.
+
+**Test run for this release** (28 October 2026, Ubuntu 22.04, ROS 2 Humble, Gazebo Harmonic 8.15,
+MuJoCo 3.12, Chromium 156): `bash tools/run_all_tests.sh` – **21 passed, 0 failed, 0 skipped**, Gazebo
+included. (One check of the digital-twin test, "the table world shows its 6 pucks", read the state too
+early after a world switch and failed once; it now waits up to 10 s and prints the count.) Before the
+3.3 work the same suite gave 13 passed, 4 failed (bugs #33–#36).
 
 ## 3.2.1 – 26 October 2026 – joysticks fixed on phones
 

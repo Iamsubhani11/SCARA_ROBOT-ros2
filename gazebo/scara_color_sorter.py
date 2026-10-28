@@ -237,6 +237,16 @@ class SorterNode(Node):
         while not all(r.done() for r in res) and time.time() < wall_end:
             time.sleep(0.005)
 
+    # belt tracking: the arm_controller follows a trajectory late (the pad trailed the puck by
+    # 15-22 mm at 0.08 m/s, about 0.2 s), so the follow path is planned that far ahead ...
+    track_lead = 0.2
+    # ... but the lag changes from pick to pick: with this lead 2 of 6 tracked picks came down around
+    # the puck and 1 held (28 Oct 2026). Until the path is corrected while following, Gazebo stops the
+    # belt for every pick; belt tracking works in MuJoCo and the app's offline cell.
+    tracking_off = ('Belt tracking is switched off in Gazebo (its arm controller lags by a different amount '
+                    'every pick; 1 of 6 tracked picks held) - the belt stops for every pick. It works in MuJoCo '
+                    'and the app offline.')
+
     def det_time(self):
         return self.dets_stamp
 

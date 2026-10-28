@@ -20,7 +20,7 @@ Arguments
   show       true|false   OpenCV camera windows                     (default true)
   rviz       true|false   RViz with the robot and the cell          (default false)
   headless   true|false   no Gazebo window, server only (cameras still render) (default false)
-  track_belt true|false   command cell: pick from the moving belt (belt tracking) (default false)
+  track_belt true|false   belt tracking - switched off in Gazebo for now, the sorter says why (default false)
   stop_old   true|false   stop a SCARA Gazebo still running from an earlier start (default true)
 """
 import os
@@ -77,7 +77,7 @@ def stop_leftovers(context):
 
 
 def name_plate(pkg):
-    """'true' when meshes/shoulder_name.stl exists (the named version of the robot)."""
+    """'true' when meshes/shoulder_name.stl exists (a robot with a name on its shoulder link)."""
     return 'true' if os.path.exists(os.path.join(pkg, 'meshes', 'shoulder_name.stl')) else 'false'
 
 

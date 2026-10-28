@@ -822,7 +822,11 @@ class TwinCore:
             # command cell: pick from the moving belt (Jacobian) instead of stopping it
             on = bool(args.get('on'))
             if not self.sim.commands:
-                return 'Belt tracking works in the command cell (MuJoCo or Gazebo, world "command")'
+                return 'Belt tracking works in the command cell (MuJoCo, world "command")'
+            if on and self.sim.kind == 'gazebo':
+                return ('Belt tracking is switched off in Gazebo: its arm controller lags by a different amount every '
+                        'pick (1 of 6 tracked picks held). Use it in MuJoCo or the offline app - Gazebo stops the belt '
+                        'for every pick.')
             self.sim.request('track on' if on else 'track off')
             self.say('Belt tracking ' + ('on: the robot follows the moving belt' if on else 'off: the belt stops for every pick'))
         elif c in ('stop_all', 'estop'):

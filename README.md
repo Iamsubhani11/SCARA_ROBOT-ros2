@@ -248,7 +248,7 @@ Then http://localhost:8080 on the PC, or the phone app → the PC's address, por
 | Table (manual picking) | Auto tab → **Table**; Manual tab drives | `gazebo.launch.py mode:=manual` · `launch_mujoco.py` |
 | Sorting cell | Auto tab → **Sorting** → Start | `gazebo.launch.py` · `launch_mujoco.py --auto --show` |
 | Command cell | Auto tab → **Command**, colours / sequence / typed / spoken | `gazebo.launch.py mode:=command` + `scara_ask.py` · `launch_mujoco.py --command` |
-| Belt tracking (3.3) | Command cell → **Follow belt** | `... mode:=command track_belt:=true` · `launch_mujoco.py --command --track-belt` |
+| Belt tracking (3.3, MuJoCo and offline – not Gazebo yet) | Command cell → **Follow belt** | `launch_mujoco.py --command --track-belt` |
 | Joysticks: joints / XY + height | Manual tab | `scara_teleop.py` · `scara_mujoco_teleop.py` (keyboard) |
 | Sliders | Manual tab → Sliders (PC: always shown) | – |
 | Keyboard / gamepad | just use it on the page (also a keyboard or pad on the phone) | `scara_joystick.py` · `scara_mujoco_joystick.py` |
@@ -631,13 +631,24 @@ The belt only pauses while the arm carries the puck to the bin. It is meant for 
 cell**: a wanted puck that comes alone is followed; when wanted pucks crowd together, or in the
 sorting cell (every puck wanted, one every 2.5 s), stopping the belt is better – our tests lost pucks
 there – so the robot does that. Tested in MuJoCo (`MuJoCo belt tracking` in `run_all_tests.sh`) and
-offline (`test_new_features.py`).
+offline (`test_new_features.py`). The camera also measures the real belt speed (every puck it sees
+again a little further on is one measurement) and the plan uses that, not the speed the belt was told.
+
+**Not in Gazebo yet.** In Gazebo it is switched off and the belt stops for every pick, as before –
+*Follow belt* says so. What we found: the camera time and the measured belt speed were right
+(0.079 m/s), but Gazebo's arm controller follows its trajectory late (about 0.2 s in the first runs),
+so the gripper came down 15–22 mm behind the puck and landed on its rim. With the path planned 0.2 s
+ahead, 2 of 6 tracked picks came down around the puck (1 held, 1 slipped while lifting) and 4 landed on
+top of it, 36 mm or more off: the lag changes from pick to pick, so a fixed lead cannot fix it.
+The code for it is still there (`track_lead`, `tracking_off` in `gazebo/scara_color_sorter.py`); the
+next step would be to correct the path while following (camera or joint feedback) instead of
+planning it all in advance.
 
 ### Demo for the review (Auto tab)
 
 One button for the presentation: the **table** (the gripper draws a star, then carries a puck to a new
 place), the **sorting cell** (about 50 s) and the **command cell** ("red then blue", then every colour
-with belt tracking). Each world switch takes a moment (Gazebo restarts, about 30 s). Tap the button
+with belt tracking – in Gazebo without it). Each world switch takes a moment (Gazebo restarts, about 30 s). Tap the button
 again, or STOP, to end it.
 
 ---
@@ -1026,8 +1037,8 @@ it – run the tests before every commit and no old bug comes back.
 `python3 tools/make_app_media.py` re-makes the README pictures of the app.
 
 What was run for 3.3.0 (27 October 2026, Ubuntu 22.04, ROS 2 Humble, Gazebo Harmonic 8.15, MuJoCo
-3.12, Chromium 156 through Playwright): the full `tools/run_all_tests.sh` – the summary is in
-CHANGELOG.md. Before the changes the same suite on this PC gave 13 passed, 4 failed (bugs #33–#36).
+3.12, Chromium 156 through Playwright): the full `tools/run_all_tests.sh` – 21 passed, 0 failed,
+0 skipped (details in CHANGELOG.md). Before the changes the same suite on this PC gave 13 passed, 4 failed (bugs #33–#36).
 
 What was run for earlier releases:
 * Gazebo Harmonic (headless, the Jazzy builds of ros_gz and gz_ros2_control) with the real launch

@@ -191,6 +191,9 @@ class Sorter:
         if on and not hasattr(self.io, 'follow'):
             self.io.log('Belt tracking needs a simulator (MuJoCo or Gazebo) - here the belt stops for every pick')
             on = False
+        if on and getattr(self.io, 'tracking_off', None):
+            self.io.log(self.io.tracking_off)        # a simulator where it was tested and does not work yet
+            on = False
         if on and self.mode != 'command':
             # tested: in the sorting cell every puck is wanted and they come every 2.5 s - chasing one
             # lets the next ones ride off the belt. Stopping the belt is the better plan there.
@@ -373,6 +376,10 @@ class Sorter:
         t_meet = (s_meet - s_now) / sp            # from now; >= t_go: the arm is early or just in time
         p_meet = (det['x'] + v[0] * (now + t_meet - t_det), det['y'] + v[1] * (now + t_meet - t_det))
         T = TRACK_DOWN + TRACK_CLOSE + TRACK_UP
+        # a simulator whose arm controller lags its trajectory says by how much (io.track_lead, s):
+        # the path is then planned that far ahead along the belt
+        lead = float(getattr(io, 'track_lead', 0.0))
+        p_meet = (p_meet[0] + v[0] * lead, p_meet[1] + v[1] * lead)
         try:
             path = K.track_line(q_above[0], q_above[2], p_meet, v, T, dt=0.1)
         except K.IKError:
